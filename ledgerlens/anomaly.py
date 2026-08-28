@@ -24,6 +24,7 @@ import pandas as pd
 from scipy import stats
 
 import config
+from ledgerlens import contracts
 from ledgerlens.models import (
     Anomaly,
     Cohort,
@@ -131,17 +132,21 @@ def evaluate(series: pd.Series, window: Window) -> Eval | None:
 # ------------------------------------------------------------------ detection
 
 
-def scan_for_onset(series: pd.Series) -> date | None:
-    """First day starting a run of MIN_CONSECUTIVE_PERIODS breaching days.
+def scan_for_onset(series: pd.Series, th: contracts.Thresholds | None = None) -> date | None:
+    """First day starting a run of `th.min_consecutive` breaching days.
 
-    A day breaches when it is BOTH statistically extreme (robust z past the MAD
-    threshold) AND practically material (relative shortfall past MIN_ABS_DELTA_PCT).
-    The second gate is a spec addition: without it the August seasonal dip sits close
+    A day breaches when it is BOTH statistically extreme (robust z past `th.mad_z`)
+    AND practically material (relative shortfall past `th.min_abs_delta_pct`). The
+    second gate is a spec addition: without it the August seasonal dip sits close
     enough to the threshold that a run of two noisy days flags roughly one August in
     seven, turning the "no false flag on 2026-07-31" acceptance test into a coin flip.
+
+    `th` defaults to the global constants, so a caller that predates per-KPI
+    contracts sees identical behaviour.
     """
+    th = th or contracts.Thresholds()
     s = series.dropna()
-    if len(s) < config.DETECT_WARMUP_DAYS:
+    if len(s) < th.warmup_days:
         return None
 
     roll = s.rolling(28, min_periods=14).median().shift(1)
@@ -157,7 +162,7 @@ def scan_for_onset(series: pd.Series) -> date | None:
     values = resid.to_numpy(dtype=float)
     exp_values = expected.to_numpy(dtype=float)
     flags = np.zeros(len(s), dtype=bool)
-    for i in range(config.DETECT_WARMUP_DAYS, len(s)):
+    for i in range(th.warmup_days, len(s)):
         if not np.isfinite(values[i]) or not np.isfinite(exp_values[i]) or exp_values[i] <= 0:
             continue
         pre = values[max(0, i - config.PRE_WINDOW_DAYS) : i]
@@ -168,12 +173,12 @@ def scan_for_onset(series: pd.Series) -> date | None:
         mad = np.median(np.abs(pre - med))
         z = 0.6745 * (values[i] - med) / max(mad, EPS)
         rel = 100.0 * values[i] / exp_values[i]
-        flags[i] = z < -config.MAD_Z_THRESHOLD and rel < -config.MIN_ABS_DELTA_PCT
+        flags[i] = z < -th.mad_z and rel < -th.min_abs_delta_pct
 
     run = 0
     for i, flagged in enumerate(flags):
         run = run + 1 if flagged else 0
-        if run >= config.MIN_CONSECUTIVE_PERIODS:
+        if run >= th.min_consecutive:
             return s.index[i - run + 1].date()
     return None
 
@@ -215,7 +220,7 @@ def detect(store: Store, metric: str, as_of: date) -> Anomaly | None:
     series, _ = store.series(metric, {}, scan_start, as_of)
     if series.empty:
         return None
-    onset = scan_for_onset(series)
+    onset = scan_for_onset(series, contracts.thresholds(metric))
     if onset is None:
         return None
 
@@ -277,6 +282,7 @@ def drill(store: Store, root: Anomaly, dims: list[str] | None = None) -> list[An
     actually drills: pick the dimension that explains the most, then go deeper.
     """
     dims = dims or config.DRILL_DIMS
+    th = contracts.thresholds(root.metric)
     out = [root]
     frontier = [root]
 
@@ -300,7 +306,7 @@ def drill(store: Store, root: Anomaly, dims: list[str] | None = None) -> list[An
                         continue
                     contribution = ev.delta_abs / (node.actual - node.expected)
                     if (
-                        ev.residual_z < -config.MAD_Z_THRESHOLD
+                        ev.residual_z < -th.mad_z
                         and contribution >= config.CONTRIBUTION_FLOOR
                     ):
                         ev = Eval(**{**ev.__dict__, "rows_per_day": rows_per_day})

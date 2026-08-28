@@ -18,7 +18,7 @@ import pandas as pd
 import streamlit as st
 
 import config
-from ledgerlens import pipeline
+from ledgerlens import contracts, pipeline
 from ledgerlens.models import cohort_label
 
 st.set_page_config(page_title="LedgerLens", page_icon="🔎", layout="wide")
@@ -55,12 +55,18 @@ st.sidebar.table(
         }
     ).set_index("component")
 )
+# Read off the contract, not off config: these are the values in force FOR THIS KPI,
+# and they are the same object scan_for_onset() was handed. SCORE_FLOOR and SEED stay
+# global -- they are pipeline parameters, not per-KPI alerting policy.
+th = contracts.thresholds(metric)
 st.sidebar.subheader("Thresholds")
+st.sidebar.caption(f"In force for `{metric}`, from its contract.")
 st.sidebar.write(
     {
-        "MAD z": config.MAD_Z_THRESHOLD,
-        "min consecutive days": config.MIN_CONSECUTIVE_PERIODS,
-        "min material drop %": config.MIN_ABS_DELTA_PCT,
+        "MAD z": th.mad_z,
+        "min consecutive days": th.min_consecutive,
+        "min material drop %": th.min_abs_delta_pct,
+        "warmup days": th.warmup_days,
         "score floor": config.SCORE_FLOOR,
         "seed": config.SEED,
     }
@@ -83,7 +89,7 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric(f"{metric} (aggregate)", f"{root.delta_pct:.1f}%", delta=money(root.delta_abs))
 c2.metric("Focal cohort", f"{focal.delta_pct:.1f}%", delta=money(focal.delta_abs))
 c3.metric("Share of the drop", f"{100 * focal.contribution:.0f}%", delta="of parent shortfall")
-c4.metric("Robust z", f"{focal.residual_z:.1f}", delta=f"threshold {-config.MAD_Z_THRESHOLD}")
+c4.metric("Robust z", f"{focal.residual_z:.1f}", delta=f"threshold {-th.mad_z}")
 
 st.markdown(
     f"### Expected **{card.seasonal_pct:.1f}%** (August seasonality). "
@@ -94,6 +100,104 @@ st.caption(
     f"{focal.window.end} · seasonality measured from the same cohort a year earlier "
     f"[{card.seasonal_query_id}]"
 )
+
+# ------------------------------------------------------------ 1b. the contract
+
+# `contracts.get` is the STRICT lookup: an ungoverned KPI raises here rather than
+# rendering an empty box. The engine's lookup is deliberately lenient -- detection
+# degrades to global defaults -- so this expander is where a governance gap becomes
+# visible instead of silent.
+contract = contracts.get(metric)
+
+with st.expander("📜 Contract — what this KPI means, and who may see which cuts of it"):
+    st.markdown(
+        f"**{contract.name}** · {contract.unit} · owner **{contract.owner}** · "
+        f"status `{contract.status}`"
+    )
+    st.write(contract.definition)
+
+    st.markdown("**Calculation** — the aggregation the engine actually issues.")
+    st.code(contract.calculation_sql, language="sql")
+
+    left, right = st.columns(2)
+    left.markdown("**Known drivers**")
+    left.markdown("\n".join(f"- {d}" for d in contract.drivers))
+
+    right.markdown("**Alerting thresholds in force**")
+    right.table(
+        pd.DataFrame(
+            [
+                {"rule": "robust z past", "value": f"-{contract.thresholds.mad_z}"},
+                {"rule": "for at least", "value": f"{contract.thresholds.min_consecutive} days"},
+                {"rule": "and a drop of at least", "value": f"{contract.thresholds.min_abs_delta_pct}%"},
+                {"rule": "after a warmup of", "value": f"{contract.thresholds.warmup_days} days"},
+                {"rule": "direction (declared)", "value": contract.thresholds.direction},
+            ]
+        ).set_index("rule")
+    )
+
+    if contract.anticipated_event_types:
+        st.caption(
+            "🔌 We would also weigh "
+            + ", ".join(f"`{t}`" for t in contract.anticipated_event_types)
+            + " — no source is connected for these, so they can never appear as a "
+            "candidate. Named rather than silently missing."
+        )
+
+    st.markdown("**Lineage & freshness** — declared cadence beside what is actually there.")
+    st.caption(
+        f"Measured as of **{as_of}**, not the wall clock: this page is a time-travel "
+        f"replay, and the generated ledger runs past the as-of date."
+    )
+    fresh = {f.source_system: f for f in contracts.freshness(store, metric, as_of)}
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "source": s.source_system,
+                    "kind": s.kind,
+                    "artifact": s.artifact,
+                    "table": s.table,
+                    "grain": s.grain,
+                    "declared cadence": s.refresh_cadence,
+                    "last seen": str(fresh[s.source_system].last_seen or "—"),
+                    "lag (days)": fresh[s.source_system].lag_days,
+                }
+                for s in contract.lineage
+            ]
+        ),
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        "Freshness queries: "
+        + " · ".join(f"`{f.query_id}`" for f in fresh.values())
+        + " — logged and replayable like every other number on this page."
+    )
+
+    st.markdown("**Access policy**")
+    if contract.access:
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "policy": r.policy_id,
+                        "role": r.role,
+                        "hidden dimensions": ", ".join(r.hidden_dims),
+                        "reason": r.reason,
+                    }
+                    for r in contract.access
+                ]
+            ),
+            width="stretch",
+            hide_index=True,
+        )
+        st.caption(
+            "Dimension-level only — this governs which *cuts* a role sees, not which "
+            "rows. Roles with no rule are unrestricted."
+        )
+    else:
+        st.caption("No dimension restrictions on this KPI.")
 
 st.divider()
 
