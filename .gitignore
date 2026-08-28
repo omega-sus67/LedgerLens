@@ -2,6 +2,18 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.~lock.*#
+
+# Deterministic generator output -- `python -m ledgerlens.gen_data` rebuilds all of
+# it from SEED. Keeping it out of the repo is what makes the cold-clone install
+# story real rather than a claim.
 data/*
 !data/.gitkeep
-.~lock.*#
+
+# Contest source material: Accenture's problem statements and our Round 1 deck.
+# Third-party copyright, ~28MB, and of no use to anyone cloning the code.
+details/
+
+# Superseded by taskflow/taskflow.md, which was written against the repo as it
+# actually stands. Kept locally for reference only.
+improvements.md
