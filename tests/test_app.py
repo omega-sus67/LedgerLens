@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from streamlit.testing.v1 import AppTest
 
 import config
 
+APP_PATH = str(Path(__file__).resolve().parent.parent / "app.py")
+
 
 @pytest.fixture(scope="module")
 def app(truth):
-    return AppTest.from_file("app.py", default_timeout=180).run()
+    return AppTest.from_file(APP_PATH, default_timeout=180).run()
 
 
 def test_page_renders_without_exceptions(app):
