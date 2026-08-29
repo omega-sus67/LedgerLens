@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import config
+from ledgerlens import personas
 from ledgerlens.models import (
     Action,
     Anomaly,
@@ -32,6 +33,22 @@ OWNER_BY_SOURCE = {
     "slack": "the on-call engineer",
     "zendesk": "support lead",
 }
+
+# A neutral phrase for the driver, so a CFO card can name the cause without naming
+# the event id. `show_event_ids` personas append the id themselves.
+DRIVER_LABEL_BY_EVENT_TYPE = {
+    "deploy": "a code release to the payment path",
+    "feature_flag": "a feature flag rollout",
+    "campaign": "a marketing budget change",
+    "price_change": "a list-price change",
+    "policy_change": "a billing policy change",
+    "external": "an external market event",
+    "vendor_incident": "a payment vendor incident",
+}
+
+
+def _driver_label(event_type: str) -> str:
+    return DRIVER_LABEL_BY_EVENT_TYPE.get(event_type, "a recorded change")
 
 
 @dataclass
@@ -179,23 +196,46 @@ def _cause_card(payload: NarrationPayload) -> DiagnosisCard:
     )
 
     owner = OWNER_BY_SOURCE.get(top.event.source, "the change owner")
+    lever = personas.lever_for_event(top.event.event_type)
     actions = [
         Action(
             priority="P0",
-            owner=owner,
+            driver=f"{_driver_label(top.event.event_type)} ({top.event.event_id})",
+            lever=lever.lever_id,
             action=(
                 f"Roll back or hotfix {top.event.event_id} for {cohort_label(top.event.blast_radius)}, "
                 f"then re-run this diagnosis to confirm recovery."
+            ),
+            expected_impact=(
+                f"Recovers up to {_money(abs(focal.delta_abs))} of the {focal.window.days}-day "
+                f"shortfall if the rollback restores the cohort to its own baseline."
+            ),
+            owner=owner,
+            confidence=top.total,
+            monitoring=(
+                f"Re-run this diagnosis daily. {cohort} back within "
+                f"{config.CONTROL_PASS_BAND_PCT:.0f}% of baseline within 3 days, or escalate."
             ),
             basis=f"{_money(focal.delta_abs)} shortfall over {focal.window.days} days [{focal.query_id}]",
         ),
         Action(
             priority="P1",
-            owner="revenue operations",
+            driver=f"{_driver_label(top.event.event_type)} ({top.event.event_id})",
+            lever="hold_forecast",
             action=(
                 f"Hold the {cohort_label({k: v for k, v in focal.cohort.items() if k == 'region'})} "
                 f"renewals forecast until the rail recovers; treat the shortfall as at-risk, "
                 f"not lost."
+            ),
+            expected_impact=(
+                f"Reclassifies {_money(abs(focal.delta_abs))} from lost to at-risk in the "
+                f"current forecast. No revenue effect on its own."
+            ),
+            owner=personas.OWNER_LABEL["revops"],
+            confidence=top.total,
+            monitoring=(
+                f"Release the hold after the cohort sits within "
+                f"{config.CONTROL_PASS_BAND_PCT:.0f}% of baseline for 3 consecutive days."
             ),
             basis=f"focal cohort actual {_money(focal.actual)} vs expected {_money(focal.expected)} [{focal.query_id}]",
         ),
@@ -208,11 +248,26 @@ def _cause_card(payload: NarrationPayload) -> DiagnosisCard:
             actions.append(
                 Action(
                     priority="P2",
-                    owner=OWNER_BY_SOURCE.get(rejected.event.source, "the change owner"),
+                    driver=(
+                        f"{_driver_label(rejected.event.event_type)} "
+                        f"({rejected.event.event_id})"
+                    ),
+                    lever=personas.lever_for_event(rejected.event.event_type).lever_id,
                     action=(
                         f"Separately: {rejected.event.event_id} did not cause this, but it is "
                         f"doing what it was designed to do to {objective.metric}. Confirm that "
                         f"trade-off is intended."
+                    ),
+                    expected_impact=(
+                        f"Restoring the budget would be expected to recover the "
+                        f"{abs(objective.observed_delta_pct):.0f}% drop in {objective.metric}; "
+                        f"it would not affect this incident."
+                    ),
+                    owner=OWNER_BY_SOURCE.get(rejected.event.source, "the change owner"),
+                    confidence=1.0,  # a measured control delta, not a ranking
+                    monitoring=(
+                        f"Track {objective.metric} in {cohort_label(objective.cohort)} weekly "
+                        f"against its pre-change baseline."
                     ),
                     basis=f"{objective.metric} {objective.observed_delta_pct:+.1f}% in "
                     f"{cohort_label(objective.cohort)} [{objective.query_id}]",
@@ -274,8 +329,16 @@ def _no_cause_card(payload: NarrationPayload) -> DiagnosisCard:
         actions=[
             Action(
                 priority="P1",
-                owner="data platform",
+                driver="no recorded change whose blast radius touches this cohort",
+                lever="connect_source",
                 action=f"Connect {missing} so the next incident of this shape has candidates to test.",
+                expected_impact=(
+                    "Not quantified -- this raises candidate coverage for future incidents. "
+                    "It does not itself recover revenue."
+                ),
+                owner=personas.OWNER_LABEL["data_platform"],
+                confidence=1.0,  # the absence of a candidate is directly observed
+                monitoring="Re-run this diagnosis after each new source lands.",
                 basis=f"no candidate above {config.SCORE_FLOOR} [{focal.query_id}]",
             )
         ],

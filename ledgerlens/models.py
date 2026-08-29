@@ -267,10 +267,28 @@ class EvidenceStep(BaseModel):
 
 
 class Action(BaseModel):
+    """The brief's recommendation chain, in the brief's order:
+
+        driver -> controllable lever -> action -> expected impact
+               -> owner -> confidence -> monitoring plan
+
+    `basis` is not part of that chain and is ours: it carries the query_id, which is
+    what lets a reader click any recommendation back to the SQL underneath it.
+
+    `confidence` is the score of the EVIDENCE the action rests on -- the hypothesis
+    score for cause-linked actions, 1.0 for directly measured ones. It is not a
+    probability that the action will work, and the UI says so.
+    """
+
     model_config = ConfigDict(frozen=True)
     priority: Literal["P0", "P1", "P2"]
-    owner: str
+    driver: str
+    lever: str
     action: str
+    expected_impact: str
+    owner: str
+    confidence: float
+    monitoring: str
     basis: str
 
 
