@@ -57,7 +57,6 @@ def test_monitoring_plan_cites_the_control_band_rather_than_a_magic_number(card)
     assert f"{config.CONTROL_PASS_BAND_PCT:.0f}%" in p0.monitoring
 
 
-@pytest.mark.xfail(reason="pipeline.diagnose lands in Task C", strict=True)
 def test_no_cause_branch_does_not_fake_a_dollar_impact(store):
     """Abstention must stay honest: we do not quantify the value of connecting a
     source we have never seen."""

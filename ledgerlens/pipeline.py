@@ -28,6 +28,60 @@ def get_store(path=None) -> Store:
     return store
 
 
+def diagnose(
+    metric: str = "mrr_renewals",
+    as_of: date = DEFAULT_AS_OF,
+    store: Store | None = None,
+    cohort: Cohort | None = None,
+    window: Window | None = None,
+) -> narrate.NarrationPayload | None:
+    """Everything up to, but not including, prose. Returns None when there is no
+    anomaly to explain.
+
+    Split out from run() so a card can be rendered for several personas from ONE
+    computation. That is what makes "identical evidence, different narrative" a
+    structural property rather than a coincidence of determinism: persona lives
+    strictly downstream of this function, so it cannot reach a query.
+    """
+    store = store or get_store()
+
+    if cohort is not None and window is not None:
+        ev, query_id = anomaly.measure(store, metric, cohort, window)
+        if ev is None:
+            return None
+        root = anomaly._anomaly_from_eval(
+            metric, cohort, window, window.start, ev, query_id, 1.0, 0, None
+        )
+        nodes = [root]
+    else:
+        root = anomaly.detect(store, metric, as_of)
+        if root is None:
+            return None
+        nodes = anomaly.drill(store, root, config.DRILL_DIMS)
+
+    focal = anomaly.focal(nodes)
+    symptoms = symptoms_mod.cluster(store, focal.window)
+    hyps = hypothesis.rank(store, focal, symptoms)
+
+    ranked = [h for h in hyps if h.rejection_reason is None]
+    rejected = [h for h in hyps if h.rejection_reason is not None]
+
+    seasonal_pct, seasonal_query_id = anomaly.seasonal_estimate(store, metric, root.cohort)
+
+    return narrate.NarrationPayload(
+        metric=metric,
+        root=root,
+        focal=focal,
+        nodes=nodes,
+        ranked=ranked,
+        rejected=rejected,
+        symptoms=symptoms,
+        seasonal_pct=seasonal_pct,
+        seasonal_query_id=seasonal_query_id,
+        no_confident_cause=not ranked or ranked[0].total < config.SCORE_FLOOR,
+    )
+
+
 def run(
     metric: str = "mrr_renewals",
     as_of: date = DEFAULT_AS_OF,
@@ -43,44 +97,10 @@ def run(
     rather than "we can't diagnose this", because the downstream chain does not care
     where the focal anomaly came from.
     """
-    store = store or get_store()
-
-    if cohort is not None and window is not None:
-        ev, query_id = anomaly.measure(store, metric, cohort, window)
-        if ev is None:
-            return DiagnosisCard.no_anomaly(metric, as_of)
-        root = anomaly._anomaly_from_eval(
-            metric, cohort, window, window.start, ev, query_id, 1.0, 0, None
-        )
-        nodes = [root]
-    else:
-        root = anomaly.detect(store, metric, as_of)
-        if root is None:
-            return DiagnosisCard.no_anomaly(metric, as_of)
-        nodes = anomaly.drill(store, root, config.DRILL_DIMS)
-
-    focal = anomaly.focal(nodes)
-    symptoms = symptoms_mod.cluster(store, focal.window)
-    hyps = hypothesis.rank(store, focal, symptoms)
-
-    ranked = [h for h in hyps if h.rejection_reason is None]
-    rejected = [h for h in hyps if h.rejection_reason is not None]
-    no_confident_cause = not ranked or ranked[0].total < config.SCORE_FLOOR
-
-    seasonal_pct, seasonal_query_id = anomaly.seasonal_estimate(store, metric, root.cohort)
-
-    payload = narrate.NarrationPayload(
-        metric=metric,
-        root=root,
-        focal=focal,
-        nodes=nodes,
-        ranked=ranked,
-        rejected=rejected,
-        symptoms=symptoms,
-        seasonal_pct=seasonal_pct,
-        seasonal_query_id=seasonal_query_id,
-    )
-    return narrate.narrate(payload, no_confident_cause=no_confident_cause)
+    payload = diagnose(metric, as_of, store=store, cohort=cohort, window=window)
+    if payload is None:
+        return DiagnosisCard.no_anomaly(metric, as_of)
+    return narrate.narrate(payload)
 
 
 def card_query_ids(card: DiagnosisCard) -> list[str]:

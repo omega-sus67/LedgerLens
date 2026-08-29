@@ -62,14 +62,16 @@ class NarrationPayload:
     symptoms: list[SymptomCluster]
     seasonal_pct: float
     seasonal_query_id: str
+    no_confident_cause: bool = False
 
 
 def _money(x: float) -> str:
     return f"{'-' if x < 0 else ''}${abs(x):,.0f}"
 
 
-def narrate(payload: NarrationPayload, no_confident_cause: bool = False) -> DiagnosisCard:
-    if no_confident_cause or not payload.ranked:
+def narrate(payload: NarrationPayload, no_confident_cause: bool | None = None) -> DiagnosisCard:
+    abstain = payload.no_confident_cause if no_confident_cause is None else no_confident_cause
+    if abstain or not payload.ranked:
         return _no_cause_card(payload)
     return _cause_card(payload)
 

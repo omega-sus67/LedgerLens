@@ -132,3 +132,29 @@ def test_runs_within_the_latency_budget(store):
     elapsed = time.perf_counter() - start
     fresh.close()
     assert elapsed < 5.0, f"pipeline took {elapsed:.1f}s"
+
+
+def test_diagnose_and_run_agree_on_every_query_id(store):
+    """run() must be exactly narrate(diagnose()). If these ever diverge, the
+    'same evidence, different narrative' claim is dead."""
+    from ledgerlens import narrate
+
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    assert payload is not None
+    from_payload = narrate.narrate(payload)
+    from_run = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+
+    assert pipeline.card_query_ids(from_payload) == pipeline.card_query_ids(from_run)
+    assert from_payload.summary == from_run.summary
+    assert from_payload.headline == from_run.headline
+
+
+def test_diagnose_returns_none_when_there_is_no_anomaly(store):
+    from datetime import date
+
+    assert pipeline.diagnose("mrr_renewals", date(2026, 7, 31), store=store) is None
+
+
+def test_payload_carries_the_abstention_flag(store):
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    assert payload.no_confident_cause is False
