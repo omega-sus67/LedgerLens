@@ -92,8 +92,14 @@ def project(coef: np.ndarray, wf: dict[int, float], n_pre: int, index: pd.Dateti
     return (intercept + slope * offsets) * np.array([wf[wd] for wd in index.weekday])
 
 
-def evaluate(series: pd.Series, window: Window) -> Eval | None:
+def evaluate(series: pd.Series, window: Window, agg: str = "sum") -> Eval | None:
     """Measure `window` against a model fitted on the PRE-window only.
+
+    `agg="ratio"` changes only the REPORTED level, never the fit: a rate's window
+    figure is the mean of its daily values, not their sum -- summing 14 daily rates
+    gives ~13.7, which is meaningless on a card. delta_pct is identical either way,
+    since dividing actual and expected by the same day count cannot change their
+    ratio, so only actual, expected and delta_abs are affected.
 
     The pre-window must exclude the anomaly. If median/MAD are taken over the window
     itself, every day is ~8% low, the residual median is ~-8%, and z collapses to
@@ -119,6 +125,10 @@ def evaluate(series: pd.Series, window: Window) -> Eval | None:
         return None
     resid_daily = win.to_numpy(dtype=float) - expected_daily
     z_daily = 0.6745 * (resid_daily - med) / max(mad, EPS)
+
+    if agg == "ratio":
+        n = len(win)
+        actual, expected = actual / n, expected / n
 
     return Eval(
         actual=actual,
@@ -229,7 +239,7 @@ def detect(store: Store, metric: str, as_of: date) -> Anomaly | None:
     full, query_id = store.series(
         metric, {}, onset - timedelta(days=config.PRE_WINDOW_DAYS), end
     )
-    ev = evaluate(full, window)
+    ev = evaluate(full, window, agg=contracts.get(metric).agg)
     if ev is None:
         return None
     return _anomaly_from_eval(metric, {}, window, onset, ev, query_id, 1.0, 0, None)
@@ -240,7 +250,7 @@ def measure(store: Store, metric: str, cohort: Cohort, window: Window) -> tuple[
     full, query_id = store.series(
         metric, cohort, window.start - timedelta(days=config.PRE_WINDOW_DAYS), window.end
     )
-    return evaluate(full, window), query_id
+    return evaluate(full, window, agg=contracts.get(metric).agg), query_id
 
 
 # ----------------------------------------------------------------- drill-down
@@ -387,7 +397,10 @@ def seasonal_estimate(
     series, query_id = store.series(
         metric, cohort, start - timedelta(days=config.PRE_WINDOW_DAYS), end
     )
-    ev = evaluate(series, Window(start=start, end=end))
+    # A KPI younger than ref_year has no prior August to compare against; evaluate()
+    # returns None on the empty series and the caller reports 0.0% seasonality, which
+    # is the honest answer rather than an extrapolated one.
+    ev = evaluate(series, Window(start=start, end=end), agg=contracts.get(metric).agg)
     if ev is None:
         return 0.0, query_id
     return ev.delta_pct, query_id

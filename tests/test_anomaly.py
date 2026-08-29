@@ -139,3 +139,39 @@ def test_mad_must_come_from_the_pre_window(store, nodes):
     )
     assert abs(z_contaminated) < config.MAD_Z_THRESHOLD
     assert abs(z_contaminated) < abs(correct.residual_z) / 10
+
+
+def test_ratio_eval_reports_window_means_not_sums(store):
+    """evaluate() sums across days. For a rate that gives ~13.7 over 14 days, which
+    is meaningless on a card. delta_pct survives a sum/sum (equal day counts), but
+    actual/expected/delta_abs must be per-day means."""
+    from ledgerlens.models import Window
+
+    w = Window(start=date(2026, 8, 4), end=date(2026, 8, 17))
+    ev, _ = anomaly.measure(
+        store, "payment_success_rate", {"region": ["DACH"], "payment_rail": ["sepa"]}, w
+    )
+    assert ev is not None
+    assert 0.0 <= ev.actual <= 1.0
+    assert 0.0 <= ev.expected <= 1.0
+    # delta_abs is in rate POINTS, so it is small and negative for the dip cohort
+    assert -1.0 < ev.delta_abs < 0.0
+
+
+def test_ratio_delta_pct_is_unaffected_by_the_mean_conversion(store):
+    """Dividing actual and expected by the same n cannot change their ratio. Asserted
+    so a future editor does not "fix" one without the other."""
+    from ledgerlens.models import Window
+
+    w = Window(start=date(2026, 8, 4), end=date(2026, 8, 17))
+    ev, _ = anomaly.measure(
+        store, "payment_success_rate", {"region": ["DACH"], "payment_rail": ["sepa"]}, w
+    )
+    assert ev.delta_pct == pytest.approx(100.0 * (ev.actual / ev.expected - 1.0))
+
+
+def test_sparse_kpi_declines_automatic_detection(store):
+    """The scenario. 55 days of history against a 120-day warmup."""
+    from ledgerlens import pipeline
+
+    assert anomaly.detect(store, "payment_success_rate", pipeline.DEFAULT_AS_OF) is None
