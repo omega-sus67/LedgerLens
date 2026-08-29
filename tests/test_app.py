@@ -102,3 +102,23 @@ def test_confidence_caption_does_not_overclaim(app):
     """A judge will ask what 0.70 means. The page must answer before they ask."""
     text = " ".join(c.value for c in app.caption)
     assert "not a probability that the action will work" in text
+
+
+def test_sparse_kpi_shows_the_insufficient_history_banner():
+    """Selecting the sparse KPI must not render a blank success box."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    at.sidebar.selectbox[0].set_value("payment_success_rate").run()
+    assert at.exception == []
+    text = " ".join(
+        [w.value for w in at.warning] + [m.value for m in at.markdown] + [c.value for c in at.caption]
+    )
+    assert "insufficient history" in text.lower()
+    assert "manual" in text.lower()
+
+
+def test_sparse_kpi_hides_the_drill_tree():
+    """Contribution analysis assumes additivity, which a rate does not have."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    at.sidebar.selectbox[0].set_value("payment_success_rate").run()
+    text = " ".join(c.value for c in at.caption)
+    assert "additiv" in text.lower()

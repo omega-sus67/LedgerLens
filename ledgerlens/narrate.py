@@ -53,6 +53,7 @@ DRIVER_LABEL_BY_EVENT_TYPE = {
 METRIC_LABEL = {
     "mrr_renewals": "MRR renewals",
     "new_logo_bookings": "new logo bookings",
+    "payment_success_rate": "Payment success rate",
 }
 
 
@@ -107,6 +108,19 @@ def _format_points(metric: str, x: float) -> str:
     which must not be confused with a percentage change: a rate falling from 98.2%
     to 91.3% is -6.9pp and -7.0%, and those are different numbers."""
     return f"{100 * x:+.2f}pp" if _is_rate(metric) else _money(x)
+
+
+def _format_magnitude(metric: str, x: float) -> str:
+    """An UNSIGNED difference, for prose that already carries the direction
+    ("$490,754 below plan"). Still points, not percent, for a rate: writing 6.88%
+    where 6.88pp is meant is the confusion _format_points exists to prevent."""
+    return f"{100 * abs(x):.2f}pp" if _is_rate(metric) else _money(abs(x))
+
+
+# Public aliases: app.py needs the same unit rules the card uses, and a UI that
+# formats a rate as dollars is the exact bug these exist to prevent.
+format_value = _format_value
+format_points = _format_points
 
 
 def _history_days(metric: str, as_of: date) -> int:
@@ -193,12 +207,12 @@ def _prose(
 
     if who.persona_id == "cfo":
         headline = (
-            f"{_metric_label(m)}: {_format_value(m, abs(root.delta_abs))} below "
+            f"{_metric_label(m)}: {_format_magnitude(m, root.delta_abs)} below "
             f"plan for {root.window.start} to {root.window.end}"
         )
         summary = (
             note
-            + f"{_metric_label(m)} came in {_format_value(m, abs(root.delta_abs))} "
+            + f"{_metric_label(m)} came in {_format_magnitude(m, root.delta_abs)} "
             f"({root.delta_pct:.1f}%) under baseline for {root.window.start} to "
             f"{root.window.end}. About {abs(payload.seasonal_pct):.1f} points of that is "
             f"normal August seasonality. The remaining {abs(unexplained):.1f} points sit "
@@ -307,7 +321,7 @@ def _actions(payload: NarrationPayload, who: personas.Persona) -> list[Action]:
                 f"then re-run this diagnosis to confirm recovery."
             ),
             expected_impact=(
-                f"Recovers up to {_format_points(m, abs(focal.delta_abs))} of the {focal.window.days}-day "
+                f"Recovers up to {_format_magnitude(m, focal.delta_abs)} of the {focal.window.days}-day "
                 f"shortfall if the rollback restores the cohort to its own baseline."
             ),
             owner=owner,
@@ -349,7 +363,7 @@ def _actions(payload: NarrationPayload, who: personas.Persona) -> list[Action]:
                 )
                 if _is_rate(m)
                 else (
-                    f"Reclassifies {_format_points(m, abs(focal.delta_abs))} from lost to at-risk "
+                    f"Reclassifies {_format_magnitude(m, focal.delta_abs)} from lost to at-risk "
                     f"in the current forecast. No revenue effect on its own."
                 )
             ),

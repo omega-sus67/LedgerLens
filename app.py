@@ -14,18 +14,21 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import json
+from datetime import date
+
 import pandas as pd
 import streamlit as st
 
 import config
 from ledgerlens import contracts, narrate, personas, pipeline
-from ledgerlens.models import DiagnosisCard, cohort_label
+from ledgerlens.models import DiagnosisCard, Window, cohort_label
 
 st.set_page_config(page_title="LedgerLens", page_icon="🔎", layout="wide")
 
 
 @st.cache_resource(show_spinner="Running diagnosis...")
-def load_payload(metric: str, as_of_iso: str):
+def load_payload(metric: str, as_of_iso: str, cohort_key: str = "", window_key: str = ""):
     """Cached on (metric, as_of) ONLY. Persona is applied AFTER this boundary, which
     is what makes switching persona instant -- and what makes "identical evidence"
     structurally true rather than a coincidence of determinism.
@@ -34,10 +37,19 @@ def load_payload(metric: str, as_of_iso: str):
     dimension changes which cuts are drilled, so it changes the payload itself.
     Add `role` to this key when Task 4 lands.
     """
+    import json
     from datetime import date
 
     store = pipeline.get_store()
-    return store, pipeline.diagnose(metric, date.fromisoformat(as_of_iso), store=store)
+    cohort = json.loads(cohort_key) if cohort_key else None
+    window = (
+        Window(**{k: date.fromisoformat(v) for k, v in zip(("start", "end"), json.loads(window_key))})
+        if window_key
+        else None
+    )
+    return store, pipeline.diagnose(
+        metric, date.fromisoformat(as_of_iso), store=store, cohort=cohort, window=window
+    )
 
 
 def money(x: float) -> str:
@@ -91,7 +103,29 @@ st.sidebar.write(
     }
 )
 
-store, payload = load_payload(metric, as_of.isoformat())
+# --- sparse KPIs: detection declines, so the analyst supplies the window.
+kpi = contracts.get(metric)
+cohort_key = window_key = ""
+
+if kpi.status == "sparse_history":
+    st.warning(
+        f"**Insufficient history for automatic detection.** `{metric}` launched "
+        f"{config.SPARSE_LAUNCH} — {(as_of - config.SPARSE_LAUNCH).days + 1} days of "
+        f"history against a {contracts.thresholds(metric).warmup_days}-day warmup. "
+        f"Detection is declined rather than run on a baseline that cannot support it. "
+        f"Select a window manually below; uncertainty is wider than on an "
+        f"established KPI."
+    )
+    c1, c2, c3 = st.columns(3)
+    w_start = c1.date_input("Window start", date(2026, 8, 4), key="mw_start")
+    w_end = c2.date_input("Window end", date(2026, 8, 17), key="mw_end")
+    # sepa exists only in these regions, so the cohort picker cannot build an
+    # empty slice by construction.
+    region = c3.selectbox("Cohort region", config.SEPA_REGIONS, index=0, key="mw_region")
+    cohort_key = json.dumps({"region": [region], "payment_rail": ["sepa"]}, sort_keys=True)
+    window_key = json.dumps([w_start.isoformat(), w_end.isoformat()])
+
+store, payload = load_payload(metric, as_of.isoformat(), cohort_key, window_key)
 card = (
     narrate.narrate(payload, persona=who)
     if payload is not None
@@ -110,8 +144,16 @@ root, focal = card.root, card.focal
 unexplained = 100 * ((1 + root.delta_pct / 100) / (1 + card.seasonal_pct / 100) - 1)
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric(f"{metric} (aggregate)", f"{root.delta_pct:.1f}%", delta=money(root.delta_abs))
-c2.metric("Focal cohort", f"{focal.delta_pct:.1f}%", delta=money(focal.delta_abs))
+c1.metric(
+    f"{metric} (aggregate)",
+    f"{root.delta_pct:.1f}%",
+    delta=narrate.format_points(metric, root.delta_abs),
+)
+c2.metric(
+    "Focal cohort",
+    f"{focal.delta_pct:.1f}%",
+    delta=narrate.format_points(metric, focal.delta_abs),
+)
 c3.metric("Share of the drop", f"{100 * focal.contribution:.0f}%", delta="of parent shortfall")
 c4.metric("Robust z", f"{focal.residual_z:.1f}", delta=f"threshold {-th.mad_z}")
 
@@ -228,10 +270,18 @@ st.divider()
 # --------------------------------------------------------------- 2. attribution
 
 st.subheader("Attribution")
-st.caption(
-    "Top-down: test the aggregate, then expand only where the parent is anomalous. "
-    "Bounds the number of tests to the anomalous path instead of the full cross-product."
-)
+if kpi.agg == "ratio":
+    st.caption(
+        "Drill-down is not shown for ratio KPIs. Contribution analysis assumes a "
+        "parent's delta is the sum of its children's — a rate is not additive, so "
+        "those numbers would look authoritative and mean nothing. Separating a mix "
+        "effect from a within-slice effect needs a method this build does not have."
+    )
+else:
+    st.caption(
+        "Top-down: test the aggregate, then expand only where the parent is anomalous. "
+        "Bounds the number of tests to the anomalous path instead of the full cross-product."
+    )
 
 rows = []
 for n in card.nodes:
