@@ -160,7 +160,14 @@ or the UI will serve stale cards. Flagged here because Tasks 2, 4, 5 and 7 all h
 
 ---
 
-## Task 2 — Personas + `Action` schema
+## Task 2 — Personas + `Action` schema  ✅ DONE
+
+> Landed 2026-08-29. Four personas, 160 tests. Implementation plan:
+> [`taskflow/task_persona.md`](task_persona.md); decisions:
+> [`docs/persona_decisions.md`](../docs/persona_decisions.md).
+> **Task 4 is now unblocked** — `Persona.role` is live and joins
+> `contracts.AccessRule.role`; task 4 is the wiring plus a test, and must add
+> `role` to `app.py`'s `load_payload` cache key.
 
 **Goal:** two audiences, *identical evidence*. That sentence is the pitch to judges:
 "different narratives, same `query_id`s."

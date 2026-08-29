@@ -114,6 +114,55 @@ The omission rule matters as much as the mapping: a dimension the source does no
 
 ---
 
+## Two audiences, identical evidence
+
+Dashboards fail different readers differently: an analyst-shaped card is useless to a
+CFO, and a CFO-shaped card is useless to the engineer who has twenty minutes to stop the
+bleeding. The usual fix is to hand the card to an LLM and ask it to rewrite per audience
+— which puts a generative model between the evidence and the reader.
+
+LedgerLens renders four personas from **one computation**. `pipeline.diagnose()` produces
+the evidence; `narrate(payload, persona)` renders it. Persona is accepted only by the
+narrator, which sits downstream of every `Store.q()` call — so it *cannot* reach a query.
+
+| Persona | Reads it to | Decision rights |
+|---|---|---|
+| **Revenue Analyst** (default) | route the work and audit every claim | all levers |
+| **CFO** | decide what to tell the board | `hold_forecast` |
+| **Payments On-Call** | stop the bleeding in twenty minutes | `rollback_release`, `disable_flag` |
+| **Growth Marketing** | find out whether the budget cut is the problem | `restore_campaign_budget` |
+
+**Decision rights are mechanical, not decorative.** Every recommendation is bound to a
+controllable *lever*. A persona that does not hold that lever sees an escalation instead
+of an instruction:
+
+> **On-call** — `[P0]` Roll back or hotfix `deploy_sepa_v214` for DACH · sepa…
+> **CFO** — `[P0]` Escalate to the team owning the service: roll back or hotfix *a code
+> release to the payment path* for DACH · sepa…
+
+Note the CFO card never says `deploy_sepa_v214`. It never says a sha anywhere, including
+inside an escalation — `show_event_ids` governs action text as well as prose.
+
+**Actions carry the brief's full chain**, and `models.py` lists the fields in that order:
+
+```
+driver -> controllable lever -> action -> expected impact -> owner -> confidence -> monitoring plan
+```
+
+`confidence` is the score of the *evidence the action rests on* — the hypothesis score
+for cause-linked actions, `1.0` for directly measured ones — not a probability that the
+action will work. The UI says so in as many words, and a test asserts the sentence is
+on the page.
+
+**The claim, machine-checked.** `test_personas_differ_in_prose_but_share_every_query_id`
+asserts four distinct summaries against one identical 19-element `query_id` list. Full
+reasoning in [`docs/persona_decisions.md`](docs/persona_decisions.md).
+
+Abstention is the one thing that never varies by audience: a CFO is never handed a
+confident answer the analyst was refused.
+
+---
+
 ## What the demo shows
 
 The synthetic data has known ground truth, so the ranking can be *proven* right rather than merely look plausible.

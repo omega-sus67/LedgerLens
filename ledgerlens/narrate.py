@@ -174,7 +174,7 @@ def _prose(
         rejected_line = (
             f"{_driver_label(payload.rejected[0].event.event_type).capitalize()} was "
             f"tested as a cause and rejected outright: "
-            f"{payload.rejected[0].rejection_reason} "
+            f"{payload.rejected[0].rejection_reason}. "
             if payload.rejected
             else ""
         )
