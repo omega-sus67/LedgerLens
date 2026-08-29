@@ -25,24 +25,26 @@ Landed since this file was first written:
 | **2 — Personas + `Action` reshape** ✅ | persona narratives, levers/decision rights, confidence | [`docs/persona_decisions.md`](../docs/persona_decisions.md) · [`task_persona.md`](task_persona.md) |
 | **3 — Third KPI, sparse history** ✅ | 3 KPIs / 3 sources, sparse-history scenario, ratio aggregation | [`docs/sparse_kpi_decisions.md`](../docs/sparse_kpi_decisions.md) · [`task_sparse_kpi.md`](task_sparse_kpi.md) |
 
-### The three things that will bite us
+### The three things that would have bitten us — **all closed by Task 0 ✅**
 
-1. **Nothing is pushed. The remote is still at Aug 16.** 13 commits ahead, and the
-   branches are stacked and unmerged: `task-3-sparse-kpi` → `task-2-personas` → `main`.
-   The deliverable is *"Public GitHub repository, including a prototype demo video and a
-   README"* — so the repo is not where the work lives, it **is** a graded artifact.
-   Right now the public repo contains none of tasks 1–3. **This is Task 0 and it comes
-   before any feature work.**
+1. ~~**Nothing is pushed. The remote is still at Aug 16.**~~ **Done.** `task-2-personas`
+   and `task-3-sparse-kpi` were fast-forwarded into `main` and pushed; `origin/main` is
+   at `3364b62`. Verified by cold-cloning the public repo into `/tmp` and following only
+   the README: 184 tests pass and `python -m ledgerlens.pipeline` reproduces the full
+   diagnosis card, decoy rejection included, with `ANTHROPIC_API_KEY` unset.
 
-2. **The README's test count is a claim, and it is now false.** `README.md:46` and
-   `README.md:268` both say `126 tests`; `CLAUDE.md:20` says the same. It is 182. On a
-   project whose entire pitch is that its numbers are checkable, a judge who runs the
-   suite and sees a different number has found the one kind of error that costs more
-   than it should.
+2. ~~**The README's test count is a claim, and it is now false.**~~ **Done.** `126` →
+   `184` in both places, and `CLAUDE.md` updated. The count is **184, not 182**, because
+   `tests/test_docs.py` adds two tests that count themselves. That file now asserts the
+   README's number against `pytest --collect-only`, so drift is a test failure rather
+   than a credibility leak.
 
-3. **`config.py:123` — `MODEL = "claude-sonnet-4-6"` is not a valid model id.** Should
-   be `claude-sonnet-5`. One line. A judge who knows the API will notice, and it is the
-   cheapest credibility point on the board.
+3. ~~**`config.py:123` is not a valid model id.**~~ **Done, but the premise was wrong.**
+   `claude-sonnet-4-6` *is* a real model id — Claude Sonnet 4.6, still served, at
+   $3/$15 per MTok. It was **stale, not invalid**, so the "a judge who knows the API
+   will notice" argument does not hold. Changed to `claude-sonnet-5` anyway: it is the
+   current Sonnet (cheaper at $2/$10, more capable) and it is the string Task 6's
+   telemetry copy quotes, so the two now agree. `tests/test_docs.py` pins it.
 
 ### Running the tests on this machine
 
@@ -83,7 +85,7 @@ single one of them is fatal. The cut below follows that distinction.
 
 | # | Task | Closes | Est. |
 |---|---|---|---|
-| 0 | Merge, correct the claims, push | the *repository* deliverable | 30m |
+| ~~0~~ | ~~Merge, correct the claims, push~~ ✅ | the *repository* deliverable | done |
 | 4 | Role-based entitlement | MPE row 7 | 1.5h |
 | 6 | Telemetry panel | MPE rows 9 **and** 10 | 1.5h |
 | 7 | Abstention demo path | hardens MPE row 5 | 1h |
@@ -549,7 +551,7 @@ RNG stream, so any new series needs its own `default_rng(SEED_*)`, and
 `tests/test_sparse_kpi.py`'s fingerprints must stay green. **If a fingerprint fails, fix
 the generator, never the hash.**
 
-**Test count is a claim.** 182 today. Tasks 4, 6 and 7 all add tests. Task 0's
+**Test count is a claim.** 184 today (182 + the two in `tests/test_docs.py`). Tasks 4, 6 and 7 all add tests. Task 0's
 `test_readme_test_count_is_true` makes drift a test failure instead of a credibility
 leak — keep it passing rather than deleting it when it goes red.
 
