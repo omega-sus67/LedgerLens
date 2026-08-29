@@ -17,9 +17,9 @@ project is already a Pydantic model.
 from __future__ import annotations
 
 from datetime import date
-from typing import TYPE_CHECKING, get_args
+from typing import TYPE_CHECKING, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 import config
 from ledgerlens.models import ChangeEvent
@@ -132,6 +132,33 @@ class KpiContract(BaseModel):
     thresholds: Thresholds = Thresholds()
     access: list[AccessRule] = []
     status: str = "active"  # "active" | "sparse_history"
+
+    # The physical metric_name rows in fact_metric backing this KPI. Defaults to the
+    # KPI's own name, so every existing contract is unchanged. A ratio KPI names its
+    # numerator and denominator here instead -- see `agg`.
+    source_metrics: list[str] = []
+    # "sum"   -> SUM(value), the additive default.
+    # "ratio" -> SUM(numerator)/SUM(denominator), a correctly WEIGHTED rate. An
+    #            unweighted AVG across slices is a different and wrong number.
+    agg: Literal["sum", "ratio"] = "sum"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_source_metrics(cls, data: dict) -> dict:
+        """mode="before", because the model is frozen: a mode="after" validator would
+        have to reach past the freeze with object.__setattr__ to fill a default."""
+        if isinstance(data, dict) and not data.get("source_metrics"):
+            data = {**data, "source_metrics": [data["name"]]}
+        return data
+
+    @model_validator(mode="after")
+    def _ratio_needs_two_sources(self) -> "KpiContract":
+        if self.agg == "ratio" and len(self.source_metrics) != 2:
+            raise ValueError(
+                f"{self.name}: agg='ratio' needs exactly two source_metrics "
+                f"(numerator, denominator), got {self.source_metrics}"
+            )
+        return self
 
     @field_validator("grain_dims")
     @classmethod
@@ -304,6 +331,55 @@ CONTRACTS: dict[str, KpiContract] = {
             ),
             *_CONTEXT_LINEAGE,
         ],
+    ),
+    "payment_success_rate": KpiContract(
+        name="payment_success_rate",
+        definition=(
+            "Share of payment authorisation attempts that succeed, weighted by "
+            "attempt volume. Launched 2026-06-23 with the new PSP integration, so its "
+            "history is far shorter than the other KPIs'."
+        ),
+        unit="rate",
+        owner="payments platform",
+        agg="ratio",
+        source_metrics=["payment_successes", "payment_attempts"],
+        status="sparse_history",
+        calculation_sql=(
+            "SELECT date, "
+            "SUM(CASE WHEN metric_name = 'payment_successes' THEN value ELSE 0 END) "
+            "/ NULLIF(SUM(CASE WHEN metric_name = 'payment_attempts' THEN value ELSE 0 END), 0) "
+            "AS value FROM fact_metric "
+            "WHERE metric_name IN ('payment_successes', 'payment_attempts') "
+            "AND date BETWEEN $start AND $end GROUP BY date ORDER BY date"
+        ),
+        grain_dims=["region", "segment", "payment_rail", "product"],
+        drivers=[
+            "PSP or acquirer incidents",
+            "connector releases on a specific rail",
+            "card scheme or mandate rule changes",
+            "issuer-side decline-rate shifts",
+        ],
+        related_event_types=["deploy", "feature_flag"],
+        anticipated_event_types=["vendor_incident", "external"],
+        lineage=[
+            LineageStep(
+                source_system="psp_webhook",
+                artifact="authorisation events",
+                table="fact_metric",
+                grain="daily x region x segment x payment_rail x product",
+                refresh_cadence="every 15 minutes",
+                kind="metric",
+            ),
+            *_CONTEXT_LINEAGE,
+        ],
+        thresholds=Thresholds(
+            # A rate that lives at 98.2% cannot fall 3% without the business having
+            # ended, so the global MIN_ABS_DELTA_PCT would make it undetectable in
+            # principle. This is the per-KPI divergence the Thresholds docstring
+            # anticipated: a gate calibrated for a bounded rate, not a dollar sum.
+            min_abs_delta_pct=0.5,
+            mad_z=3.0,
+        ),
     ),
 }
 

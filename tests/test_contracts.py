@@ -64,11 +64,26 @@ def test_mrr_thresholds_are_the_tuned_acceptance_values():
     )
 
 
-def test_every_contract_currently_uses_the_global_defaults():
-    """True today, and worth knowing the moment it stops being true: Task 3's sparse
-    KPI is supposed to diverge, and this test failing is how we confirm it did."""
-    for contract in contracts.CONTRACTS.values():
-        assert contract.thresholds == Thresholds()
+def test_established_contracts_use_the_global_defaults():
+    """The two dollar-denominated KPIs share the global gate, so the acceptance test
+    in test_pipeline.py rests on exactly one set of numbers.
+
+    This used to assert it of EVERY contract, with a docstring predicting that Task
+    3's sparse KPI would break it. It did, on purpose -- see the test below.
+    """
+    for name in ("mrr_renewals", "new_logo_bookings"):
+        assert contracts.CONTRACTS[name].thresholds == Thresholds()
+
+
+def test_the_rate_kpi_deliberately_diverges_from_the_global_gate():
+    """A rate bounded near 98.2% cannot move 3% without the business having ended, so
+    the global MIN_ABS_DELTA_PCT would make it undetectable in principle. Per-KPI
+    thresholds exist precisely for this -- it is the first real divergence, and the
+    Thresholds docstring named this exact case before the KPI existed."""
+    th = contracts.thresholds("payment_success_rate")
+    assert th != Thresholds()
+    assert th.min_abs_delta_pct < config.MIN_ABS_DELTA_PCT
+    assert th.mad_z < config.MAD_Z_THRESHOLD
 
 
 # ----------------------------------------------------------------- validators

@@ -139,21 +139,40 @@ class Store:
     def series(
         self, metric: str, cohort: Cohort, start: date, end: date
     ) -> tuple[pd.Series, str]:
-        """Daily summed series for a cohort, reindexed to a gapless daily range."""
+        """Daily series for a cohort, reindexed to a gapless daily range.
+
+        Additive KPIs are SUM(value). Ratio KPIs are SUM(numerator)/SUM(denominator)
+        -- a WEIGHTED rate, so a big slice counts more, which is what a rate means. An
+        unweighted AVG across slices would be a different and wrong number, and
+        SUM(value) on a rate would return ~97 for a metric bounded at 1.
+        """
+        from ledgerlens import contracts
+
         key = (metric, canonical_cohort_key(cohort), start.isoformat(), end.isoformat())
         if key in self._series_cache:
             return self._series_cache[key]
 
-        sql = (
-            "SELECT date, SUM(value) AS value FROM fact_metric "
-            f"WHERE metric_name = $metric AND date BETWEEN $start AND $end "
-            f"AND {cohort_predicate(cohort)} GROUP BY date ORDER BY date"
-        )
-        df, query_id = self.q(
-            sql,
-            {"metric": metric, "start": start, "end": end},
-            label=f"{metric} daily series",
-        )
+        contract = contracts.CONTRACTS.get(metric)
+        if contract is not None and contract.agg == "ratio":
+            num, den = contract.source_metrics
+            sql = (
+                "SELECT date, "
+                "SUM(CASE WHEN metric_name = $num THEN value ELSE 0 END) "
+                "/ NULLIF(SUM(CASE WHEN metric_name = $den THEN value ELSE 0 END), 0) "
+                "AS value FROM fact_metric "
+                "WHERE metric_name IN ($num, $den) AND date BETWEEN $start AND $end "
+                f"AND {cohort_predicate(cohort)} GROUP BY date ORDER BY date"
+            )
+            params: dict = {"num": num, "den": den, "start": start, "end": end}
+        else:
+            sql = (
+                "SELECT date, SUM(value) AS value FROM fact_metric "
+                f"WHERE metric_name = $metric AND date BETWEEN $start AND $end "
+                f"AND {cohort_predicate(cohort)} GROUP BY date ORDER BY date"
+            )
+            params = {"metric": metric, "start": start, "end": end}
+
+        df, query_id = self.q(sql, params, label=f"{metric} daily series")
         if df.empty:
             s = pd.Series(dtype="float64")
         else:
@@ -168,7 +187,17 @@ class Store:
         The metric filter is mandatory (spec 16 #2): without it a blast radius that
         is unconstrained on metric gets its |B| inflated by the other metric's rows
         and the Jaccard comparison in the C component silently breaks.
+
+        A ratio KPI has no rows under its own name, so it counts its DENOMINATOR --
+        the exposure base, which is what C's Jaccard is measuring anyway. Skipping
+        this mapping returns 0 for every cohort, which drives C to 0.0 for every
+        candidate and destroys the ranking on that KPI while every other test passes.
         """
+        from ledgerlens import contracts
+
+        contract = contracts.CONTRACTS.get(metric)
+        physical = contract.source_metrics[-1] if contract is not None else metric
+
         sql = (
             "SELECT count(*) AS n FROM fact_metric "
             f"WHERE metric_name = $metric AND date BETWEEN $start AND $end "
@@ -176,7 +205,7 @@ class Store:
         )
         df, query_id = self.q(
             sql,
-            {"metric": metric, "start": window.start, "end": window.end},
+            {"metric": physical, "start": window.start, "end": window.end},
             label="cohort row count",
         )
         return int(df["n"].iloc[0]), query_id
