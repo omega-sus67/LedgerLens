@@ -18,19 +18,26 @@ import pandas as pd
 import streamlit as st
 
 import config
-from ledgerlens import contracts, pipeline
-from ledgerlens.models import cohort_label
+from ledgerlens import contracts, narrate, personas, pipeline
+from ledgerlens.models import DiagnosisCard, cohort_label
 
 st.set_page_config(page_title="LedgerLens", page_icon="🔎", layout="wide")
 
 
 @st.cache_resource(show_spinner="Running diagnosis...")
-def load(metric: str, as_of_iso: str):
+def load_payload(metric: str, as_of_iso: str):
+    """Cached on (metric, as_of) ONLY. Persona is applied AFTER this boundary, which
+    is what makes switching persona instant -- and what makes "identical evidence"
+    structurally true rather than a coincidence of determinism.
+
+    Task 4 (role-based entitlement) CANNOT stay below this boundary: hiding a
+    dimension changes which cuts are drilled, so it changes the payload itself.
+    Add `role` to this key when Task 4 lands.
+    """
     from datetime import date
 
     store = pipeline.get_store()
-    card = pipeline.run(metric, date.fromisoformat(as_of_iso), store=store)
-    return store, card
+    return store, pipeline.diagnose(metric, date.fromisoformat(as_of_iso), store=store)
 
 
 def money(x: float) -> str:
@@ -44,6 +51,18 @@ st.sidebar.caption("Anomaly ∩ change ledger, verified by negative controls.")
 
 metric = st.sidebar.selectbox("Metric", config.METRICS, index=0)
 as_of = st.sidebar.date_input("As of", pipeline.DEFAULT_AS_OF)
+
+persona_id = st.sidebar.selectbox(
+    "Persona",
+    list(personas.PERSONAS),
+    index=list(personas.PERSONAS).index(personas.DEFAULT_PERSONA_ID),
+    format_func=lambda pid: personas.get(pid).label,
+)
+who = personas.get(persona_id)
+st.sidebar.caption(
+    f"Delivered to **{who.channel}** · depth `{who.depth}` · "
+    f"decision rights: {', '.join(who.decision_rights)}"
+)
 
 st.sidebar.subheader("Scoring weights")
 st.sidebar.caption("A product decision, not a hidden hyperparameter.")
@@ -72,7 +91,12 @@ st.sidebar.write(
     }
 )
 
-store, card = load(metric, as_of.isoformat())
+store, payload = load_payload(metric, as_of.isoformat())
+card = (
+    narrate.narrate(payload, persona=who)
+    if payload is not None
+    else DiagnosisCard.no_anomaly(metric, as_of)
+)
 
 # ------------------------------------------------------------- 1. the anomaly
 
@@ -270,7 +294,9 @@ def render_hypothesis(h, rank: int | None, rejected: bool) -> None:
             col.caption(f"**{key}** {labels[key]} · w={config.SCORE_WEIGHTS[key]}")
             col.progress(min(max(value, 0.0), 1.0), text=f"{value:.2f}")
 
-        if h.controls:
+        # Depth personalization: on-call and the analyst want every control; the CFO
+        # and growth get the verdict without the check-by-check table.
+        if h.controls and who.show_control_table:
             frame = pd.DataFrame(
                 [
                     {
@@ -338,8 +364,19 @@ for i, step in enumerate(card.causal_chain, 1):
             st.text(row["result_preview"])
 
 st.markdown("**Recommended actions**")
+st.caption(
+    f"Shown for **{who.label}**. Confidence is the score of the evidence each action "
+    f"rests on — it is not a probability that the action will work."
+)
 for a in card.actions:
     st.markdown(f"**[{a.priority}] {a.owner}** — {a.action}")
+    st.markdown(
+        f"driver: {a.driver}  \n"
+        f"lever: `{a.lever}`  \n"
+        f"expected impact: {a.expected_impact}  \n"
+        f"confidence: {a.confidence:.2f}  \n"
+        f"monitoring: {a.monitoring}"
+    )
     st.caption(f"basis: {a.basis}")
 
 st.divider()

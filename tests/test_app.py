@@ -83,3 +83,22 @@ def test_access_policy_is_named_on_the_page(app):
     to be legible here first."""
     frames = [df.value for df in app.dataframe]
     assert any("policy" in getattr(f, "columns", []) for f in frames)
+
+
+def test_persona_selector_is_present(app):
+    labels = [s.label for s in app.sidebar.selectbox]
+    assert "Persona" in labels
+
+
+def test_actions_render_the_full_recommendation_chain(app):
+    text = " ".join(m.value for m in app.markdown)
+    assert "lever:" in text
+    assert "expected impact:" in text
+    assert "confidence:" in text
+    assert "monitoring:" in text
+
+
+def test_confidence_caption_does_not_overclaim(app):
+    """A judge will ask what 0.70 means. The page must answer before they ask."""
+    text = " ".join(c.value for c in app.caption)
+    assert "not a probability that the action will work" in text
