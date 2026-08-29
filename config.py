@@ -120,7 +120,7 @@ CI_LEVEL = 0.95
 # ---------------------------------------------------------------- investigator
 LLM_TEST_BUDGET = 6
 EXPLORER_QUERY_BUDGET = 12
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-5"
 
 # ---------------------------------------------------------------- generator
 GEN_START = date(2025, 3, 1)

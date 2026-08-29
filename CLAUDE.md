@@ -15,21 +15,30 @@ Read [README.md](README.md) first for what the system actually does and the hone
 scope of its claims — it is the canonical description and is kept accurate
 deliberately; don't let this file duplicate or drift from it.
 
-## Current state (as of 2026-08-28)
+## Current state (as of 2026-08-29)
 
-- Deterministic core is done and stable: **126 tests passing**, decoy-rejection demo
+- Deterministic core is done and stable: **184 tests passing**, decoy-rejection demo
   works end-to-end, README's claims verified against the code.
+- **Tasks 1, 2 and 3 are done and merged to `main`** (KPI semantic contract; personas +
+  `Action` reshape; third KPI with sparse history). Rationale for each lives in
+  `docs/contracts_decisions.md`, `docs/persona_decisions.md` and
+  `docs/sparse_kpi_decisions.md`.
 - Confirmed via a genuine cold clone (`git clone` into `/tmp`, fresh venv, README's
   documented install steps only) that `gen_data.py` -> `pytest` -> `pipeline.py`
   reproduce the full diagnosis card with zero data files at checkout. `data/*` is
   gitignored on purpose -- it's deterministic generator output (`SEED = 20260815`)
   -- and that design is correct, not a bug.
-- **`taskflow/taskflow.md` is the live plan**, written 2026-08-28 against the repo as
-  it stands. It supersedes `improvements.md`, whose Aug 26-27 schedule did not land.
-  Twelve tasks, ordered so each unblocks the next; items 1-7 are literal rows on the
-  judges' Minimum Prototype Expectations list and must never be cut.
-- **Nothing since 2026-08-16 is pushed.** All of the contract work is uncommitted
-  local state.
+- **`taskflow/taskflow.md` is the live plan**, rewritten 2026-08-29 and cut to
+  essentials. The original twelve tasks were not achievable in the time left; what
+  remains is 4 (role-based entitlement), 6 (telemetry panel), 7 (abstention demo path)
+  and 12 (submission package), plus conditional 5. Tasks 8-11 are cut deliberately and
+  are named in the file with the reason. Seven of the ten Minimum Prototype
+  Expectations already close; tasks 4 and 6 close the remaining three rows.
+- **Everything through task 3 is pushed to `origin/main`.** The stacked branches
+  `task-2-personas` and `task-3-sparse-kpi` were fast-forwarded into `main`.
+- **`tests/test_docs.py` guards the README's own claims.** The test count in
+  `README.md` and the `MODEL` id in `config.py` are now assertions, not prose. If it
+  goes red, update the document -- do not delete the test.
 
 ## Done: task 1 -- the KPI semantic contract
 
@@ -58,7 +67,8 @@ this section is only the state summary.
   unconnected event types, thresholds, lineage+freshness, access policy). Sidebar
   thresholds AND the headline "Robust z" caption now read `contracts.thresholds(metric)`
   instead of `config.*`, so the contract is visibly in force rather than decorative.
-- `tests/test_contracts.py` (new, 26 tests) + 4 added to `tests/test_app.py`. The
+- `tests/test_contracts.py` (new; 26 tests at task 1, 29 after task 3 added the ratio
+  KPI) + 4 added to `tests/test_app.py`. The
   important one is `test_threshold_defaults_are_exactly_the_global_constants`: it
   guards the invariant the already-landed `anomaly.py` refactor rests on, which
   nothing checked before. Also a `calculation_sql` round-trip against `Store.series()`,
@@ -72,8 +82,9 @@ this section is only the state summary.
 `models.py` and `pipeline.py` are untouched and `test_pipeline.py`'s acceptance test is
 not at risk. Provenance is preserved by the `query_id` on each `SourceFreshness`.
 
-**Next up: task 2 (personas + `Action` reshape).** When it lands, fix `app.py`'s
-`@st.cache_resource` key ONCE -- it currently keys on `(metric, as_of_iso)` only, and
+**Cache-key debt, still unpaid.** Task 2 moved the narration boundary so persona needs
+no key, but tasks 4 (role), 5 (feedback) and 7 (dropped sources) each change the
+*payload*. Fix `app.py`'s `@st.cache_resource` key ONCE, in task 4 -- it currently keys on `(metric, as_of_iso)` only, and
 tasks 2, 4, 5 and 7 each add an input that changes the rendered card. Task 1 needed no
 cache work (the expander renders outside `load()`), so this is still unpaid.
 
@@ -119,11 +130,12 @@ cache work (the expander renders outside `load()`), so this is still unpaid.
 
 ## Deadline context
 
-Submission: **2026-08-30**. The schedule is `taskflow/taskflow.md`'s task order, not
-`improvements.md`'s (that one assumed Aug 26-27 work that did not land). Task 1 is done;
-2-7 are the remaining checklist rows and are non-negotiable, since a missing checklist
-row is a zero rather than a deduction. Cut line if behind: drop task 11 (ambiguity),
-then 10 (Slack ingest), then 9 (effect CI), then 8 (real LLM call).
+Submission: **2026-08-30**. The schedule is `taskflow/taskflow.md`'s task order. Tasks
+1-3 are done and merged; 4, 6 and 7 are the remaining checklist rows and are
+non-negotiable, since a missing checklist row is a zero rather than a deduction. Task 12
+(submission package) is a *deliverable*, not a feature -- never cut it. Cut line if
+behind: drop task 5 (learning loop), then the P2 items inside 12. Tasks 8-11 are already
+cut.
 
 `gen_data.py` is the fragile one -- tasks 3 and 11 both touch it, it is seeded, and
 `test_pipeline.py` asserts the exact injected incident and the exact rejected decoy.
