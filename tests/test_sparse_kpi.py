@@ -64,3 +64,49 @@ def test_sparse_history_still_supports_a_manual_window(truth):
     window_start = pipeline.DEFAULT_AS_OF - timedelta(days=13)
     pre_days = (window_start - config.SPARSE_LAUNCH).days
     assert pre_days >= 30, "manual path needs fit_pre_window's 30-day floor"
+
+
+@pytest.fixture(scope="module")
+def sparse_card(store):
+    """The manual path: detection declined, so the analyst supplies the window."""
+    return pipeline.run(
+        "payment_success_rate",
+        pipeline.DEFAULT_AS_OF,
+        store=store,
+        cohort={"region": ["DACH"], "payment_rail": ["sepa"]},
+        window=Window(start=date(2026, 8, 4), end=date(2026, 8, 17)),
+    )
+
+
+def test_manual_path_produces_a_full_card(sparse_card):
+    """Declining to DETECT is not declining to help."""
+    assert sparse_card.causal_chain
+    assert sparse_card.actions
+    assert pipeline.card_query_ids(sparse_card)
+
+
+def test_rate_kpi_is_never_formatted_as_dollars(sparse_card):
+    """_money() on a rate renders '-$0.07'. The contract carries unit='rate'."""
+    text = f"{sparse_card.headline} {sparse_card.summary} "
+    text += " ".join(a.expected_impact + a.action for a in sparse_card.actions)
+    text += " ".join(s.observed for s in sparse_card.causal_chain)
+    assert "$" not in text
+
+
+def test_card_states_the_history_limitation_up_front(sparse_card):
+    """The decline must be legible. A blank success box is the failure mode."""
+    assert "insufficient history" in sparse_card.summary.lower()
+    assert "manual" in sparse_card.summary.lower()
+
+
+def test_sparse_card_widens_its_own_uncertainty(sparse_card):
+    """55 days of history is not 400. Actions grounded on it must say so."""
+    assert any("warmup" in a.monitoring.lower() or "short history" in a.monitoring.lower()
+               for a in sparse_card.actions)
+
+
+def test_established_kpi_carries_no_sparse_preamble(store):
+    """The banner must not leak onto KPIs that do not need it."""
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    assert "insufficient history" not in card.summary.lower()
+    assert "$" in card.summary

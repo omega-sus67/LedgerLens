@@ -174,7 +174,15 @@ class Store:
 
         df, query_id = self.q(sql, params, label=f"{metric} daily series")
         if df.empty:
-            s = pd.Series(dtype="float64")
+            # Still reindex, so the EMPTY case honours this method's contract of
+            # returning a gapless DatetimeIndex. A bare Series carries a RangeIndex,
+            # and every caller that compares `series.index` to a Timestamp -- e.g.
+            # evaluate()'s pre-window split -- raises TypeError instead of returning
+            # None. Only reachable for a KPI with no rows in the requested range,
+            # which is exactly what a newly launched KPI looks like before launch.
+            s = pd.Series(
+                float("nan"), index=pd.date_range(start, end, freq="D"), dtype="float64"
+            )
         else:
             s = pd.Series(df["value"].to_numpy(dtype="float64"), index=pd.to_datetime(df["date"]))
             s = s.reindex(pd.date_range(start, end, freq="D"))

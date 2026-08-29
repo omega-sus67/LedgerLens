@@ -12,6 +12,7 @@ SQL that produced it.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 import config
 from ledgerlens import personas
@@ -81,6 +82,64 @@ def _money(x: float) -> str:
     return f"{'-' if x < 0 else ''}${abs(x):,.0f}"
 
 
+def _is_rate(metric: str) -> bool:
+    from ledgerlens import contracts
+
+    contract = contracts.CONTRACTS.get(metric)
+    return contract is not None and contract.unit == "rate"
+
+
+def _is_sparse(metric: str) -> bool:
+    from ledgerlens import contracts
+
+    contract = contracts.CONTRACTS.get(metric)
+    return contract is not None and contract.status == "sparse_history"
+
+
+def _format_value(metric: str, x: float) -> str:
+    """Render a LEVEL in its KPI's own unit. `_money` is not universal -- a rate
+    formatted as dollars reads "-$0.07", which is both wrong and unreadable."""
+    return f"{100 * x:.2f}%" if _is_rate(metric) else _money(x)
+
+
+def _format_points(metric: str, x: float) -> str:
+    """Render a DIFFERENCE in the KPI's unit. For a rate that is percentage POINTS,
+    which must not be confused with a percentage change: a rate falling from 98.2%
+    to 91.3% is -6.9pp and -7.0%, and those are different numbers."""
+    return f"{100 * x:+.2f}pp" if _is_rate(metric) else _money(x)
+
+
+def _history_days(metric: str, as_of: date) -> int:
+    """How much history this KPI actually has, for the sparse-history preamble.
+
+    Read from config rather than counted from the data: the card states a fact about
+    the KPI's launch, not about whichever window happens to be loaded.
+    """
+    from ledgerlens import contracts
+
+    contract = contracts.CONTRACTS.get(metric)
+    if contract is None or contract.status != "sparse_history":
+        return 0
+    return (as_of - config.SPARSE_LAUNCH).days + 1
+
+
+def _sparse_note(payload: "NarrationPayload") -> str:
+    """Stated to EVERY persona, in the same words. Declining to detect is a fact
+    about the evidence, and abstention never varies by audience."""
+    from ledgerlens import contracts
+
+    contract = contracts.CONTRACTS.get(payload.metric)
+    if contract is None or contract.status != "sparse_history":
+        return ""
+    return (
+        f"{payload.metric} has insufficient history for automatic detection "
+        f"({_history_days(payload.metric, payload.focal.window.end)} days against a "
+        f"{contracts.thresholds(payload.metric).warmup_days}-day warmup), so this "
+        f"window was selected manually and the uncertainty here is wider than on an "
+        f"established KPI. "
+    )
+
+
 def narrate(
     payload: NarrationPayload,
     persona: personas.Persona | None = None,
@@ -129,19 +188,22 @@ def _prose(
     top = payload.ranked[0]
     focal, root = payload.focal, payload.root
     n_pass = sum(1 for c in top.controls if c.passed)
+    m = payload.metric
+    note = _sparse_note(payload)
 
     if who.persona_id == "cfo":
         headline = (
-            f"{_metric_label(payload.metric)}: {_money(abs(root.delta_abs))} below "
+            f"{_metric_label(m)}: {_format_value(m, abs(root.delta_abs))} below "
             f"plan for {root.window.start} to {root.window.end}"
         )
         summary = (
-            f"{_metric_label(payload.metric)} came in {_money(abs(root.delta_abs))} "
+            note
+            + f"{_metric_label(m)} came in {_format_value(m, abs(root.delta_abs))} "
             f"({root.delta_pct:.1f}%) under baseline for {root.window.start} to "
             f"{root.window.end}. About {abs(payload.seasonal_pct):.1f} points of that is "
             f"normal August seasonality. The remaining {abs(unexplained):.1f} points sit "
             f"almost entirely in one customer group -- {cohort} -- which is "
-            f"{_money(focal.delta_abs)} short against its own baseline. "
+            f"{_format_points(m, focal.delta_abs)} short against its own baseline. "
             f"{_driver_label(top.event.event_type).capitalize()} is the leading "
             f"explanation, and it survived every check run against it. Treat the "
             f"shortfall as at-risk revenue, not lost revenue, until the fix ships. "
@@ -155,11 +217,12 @@ def _prose(
             f"{abs(focal.delta_pct):.0f}%"
         )
         summary = (
-            f"{top.event.event_id} ({top.event.description}) went out "
+            note
+            + f"{top.event.event_id} ({top.event.description}) went out "
             f"{top.event.ts_start:%Y-%m-%d %H:%M}. Declared blast radius: "
             f"{cohort_label(top.event.blast_radius)}. {payload.metric} in {cohort} is "
             f"{focal.delta_pct:.0f}% below baseline from {focal.window.start}, "
-            f"{_money(focal.delta_abs)} over {focal.window.days} days. "
+            f"{_format_points(m, focal.delta_abs)} over {focal.window.days} days. "
             f"Score {top.total:.2f}; {n_pass}/{len(top.controls)} negative controls "
             f"pass. Rollback is the P0. "
             f"This ranks evidence; it does not prove causation."
@@ -179,8 +242,9 @@ def _prose(
             else ""
         )
         summary = (
-            f"{payload.metric} in {cohort} is {focal.delta_pct:.0f}% below baseline "
-            f"({_money(focal.delta_abs)}). {rejected_line}"
+            note
+            + f"{payload.metric} in {cohort} is {focal.delta_pct:.0f}% below baseline "
+            f"({_format_points(m, focal.delta_abs)}). {rejected_line}"
             f"The leading explanation is {_driver_label(top.event.event_type)} affecting "
             f"how that group pays, not demand. The budget change is still doing what it "
             f"was designed to do to acquisition -- see the P2 below. "
@@ -196,10 +260,11 @@ def _prose(
         f"with {top.event.event_id}"
     )
     summary = (
-        f"{payload.metric} is {root.delta_pct:.1f}% below baseline for "
+        note
+        + f"{payload.metric} is {root.delta_pct:.1f}% below baseline for "
         f"{root.window.start} to {root.window.end}. Roughly {payload.seasonal_pct:.1f}% of that "
         f"is August seasonality; the remaining {unexplained:.1f}% concentrates almost entirely "
-        f"in {cohort}, which is down {focal.delta_pct:.0f}% and {_money(focal.delta_abs)} against "
+        f"in {cohort}, which is down {focal.delta_pct:.0f}% and {_format_points(m, focal.delta_abs)} against "
         f"its own baseline. Of {len(payload.ranked) + len(payload.rejected)} recorded changes "
         f"whose blast radius touches that cohort, {top.event.event_id} scores {top.total:.2f} "
         f"and survives all {len(top.controls)} of its negative controls. "
@@ -224,6 +289,7 @@ def _actions(payload: NarrationPayload, who: personas.Persona) -> list[Action]:
     # How this change is named to THIS reader. Personas with show_event_ids=False get
     # the driver phrase instead of the sha; the evidence in `basis` is identical
     # either way, which is the whole point.
+    m = payload.metric
     ref = top.event.event_id if who.show_event_ids else _driver_label(top.event.event_type)
     driver = (
         f"{_driver_label(top.event.event_type)} ({ref})"
@@ -241,7 +307,7 @@ def _actions(payload: NarrationPayload, who: personas.Persona) -> list[Action]:
                 f"then re-run this diagnosis to confirm recovery."
             ),
             expected_impact=(
-                f"Recovers up to {_money(abs(focal.delta_abs))} of the {focal.window.days}-day "
+                f"Recovers up to {_format_points(m, abs(focal.delta_abs))} of the {focal.window.days}-day "
                 f"shortfall if the rollback restores the cohort to its own baseline."
             ),
             owner=owner,
@@ -249,21 +315,43 @@ def _actions(payload: NarrationPayload, who: personas.Persona) -> list[Action]:
             monitoring=(
                 f"Re-run this diagnosis daily. {cohort} back within "
                 f"{config.CONTROL_PASS_BAND_PCT:.0f}% of baseline within 3 days, or escalate."
+                + (
+                    " Re-assess once this KPI clears its detection warmup; the current "
+                    "baseline rests on a short history."
+                    if _is_sparse(m)
+                    else ""
+                )
             ),
-            basis=f"{_money(focal.delta_abs)} shortfall over {focal.window.days} days [{focal.query_id}]",
+            basis=f"{_format_points(m, focal.delta_abs)} shortfall over {focal.window.days} days [{focal.query_id}]",
         ),
         Action(
             priority="P1",
             driver=driver,
             lever="hold_forecast",
             action=(
-                f"Hold the {cohort_label({k: v for k, v in focal.cohort.items() if k == 'region'})} "
-                f"renewals forecast until the rail recovers; treat the shortfall as at-risk, "
-                f"not lost."
+                (
+                    f"Flag {cohort_label({k: v for k, v in focal.cohort.items() if k == 'region'})} "
+                    f"collections as at-risk until the rail recovers; do not re-forecast on "
+                    f"the assumption these authorisations succeeded."
+                )
+                if _is_rate(m)
+                else (
+                    f"Hold the {cohort_label({k: v for k, v in focal.cohort.items() if k == 'region'})} "
+                    f"renewals forecast until the rail recovers; treat the shortfall as at-risk, "
+                    f"not lost."
+                )
             ),
             expected_impact=(
-                f"Reclassifies {_money(abs(focal.delta_abs))} from lost to at-risk in the "
-                f"current forecast. No revenue effect on its own."
+                (
+                    "Not quantified in revenue terms: this KPI measures authorisation "
+                    "success, not collected revenue, and how much converts depends on "
+                    "retry recovery we do not model here."
+                )
+                if _is_rate(m)
+                else (
+                    f"Reclassifies {_format_points(m, abs(focal.delta_abs))} from lost to at-risk "
+                    f"in the current forecast. No revenue effect on its own."
+                )
             ),
             owner=personas.OWNER_LABEL["revops"],
             confidence=top.total,
@@ -271,7 +359,7 @@ def _actions(payload: NarrationPayload, who: personas.Persona) -> list[Action]:
                 f"Release the hold after the cohort sits within "
                 f"{config.CONTROL_PASS_BAND_PCT:.0f}% of baseline for 3 consecutive days."
             ),
-            basis=f"focal cohort actual {_money(focal.actual)} vs expected {_money(focal.expected)} [{focal.query_id}]",
+            basis=f"focal cohort actual {_format_value(m, focal.actual)} vs expected {_format_value(m, focal.expected)} [{focal.query_id}]",
         ),
     ]
     for rejected in payload.rejected:
@@ -331,11 +419,18 @@ def _cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCa
                 f"baseline over {root.window.start} to {root.window.end}."
             ),
             query_id=root.query_id,
-            observed=f"actual {_money(root.actual)} vs expected {_money(root.expected)}",
+            observed=f"actual {_format_value(payload.metric, root.actual)} vs expected {_format_value(payload.metric, root.expected)}",
         ),
         EvidenceStep(
             claim=(
-                f"About {payload.seasonal_pct:.1f}% of that is ordinary August seasonality, "
+                (
+                    f"No seasonal adjustment is applied: {payload.metric} launched "
+                    f"{config.SPARSE_LAUNCH} and has no prior August to compare against, "
+                    f"so the whole {unexplained:.1f}% is unexplained rather than "
+                    f"partly calendar. "
+                )
+                if _is_sparse(payload.metric)
+                else f"About {payload.seasonal_pct:.1f}% of that is ordinary August seasonality, "
                 f"measured from the same cohort a year earlier. That leaves "
                 f"{unexplained:.1f}% genuinely unexplained."
             ),
@@ -349,7 +444,7 @@ def _cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCa
                 f"parent's shortfall."
             ),
             query_id=focal.query_id,
-            observed=f"shortfall {_money(focal.delta_abs)} (z = {focal.residual_z:.1f})",
+            observed=f"shortfall {_format_points(payload.metric, focal.delta_abs)} (z = {focal.residual_z:.1f})",
         ),
         EvidenceStep(
             claim=(
@@ -448,7 +543,7 @@ def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> Diagnosi
         ),
         summary=(
             f"The anomaly is real: {cohort_label(focal.cohort)} is {focal.delta_pct:.1f}% below "
-            f"baseline ({_money(focal.delta_abs)}) over {focal.window.start} to {focal.window.end}."
+            f"baseline ({_format_points(payload.metric, focal.delta_abs)}) over {focal.window.start} to {focal.window.end}."
             f"{best} No recorded change whose blast radius touches this cohort clears the "
             f"confidence floor. Connected sources: {connected}. Not connected: {missing}. "
             f"The cause may well sit in one of those."
@@ -457,7 +552,7 @@ def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> Diagnosi
             EvidenceStep(
                 claim=f"{cohort_label(focal.cohort)} is {focal.delta_pct:.1f}% below baseline.",
                 query_id=focal.query_id,
-                observed=f"actual {_money(focal.actual)} vs expected {_money(focal.expected)}",
+                observed=f"actual {_format_value(payload.metric, focal.actual)} vs expected {_format_value(payload.metric, focal.expected)}",
             )
         ],
         effect=None,

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pandas as pd
+
 from ledgerlens.models import Window
 
 
@@ -33,3 +35,13 @@ def test_ratio_cohort_rows_counts_the_denominator(store):
     w = Window(start=date(2026, 8, 4), end=date(2026, 8, 17))
     n, _ = store.cohort_rows({"region": ["DACH"]}, w, "payment_success_rate")
     assert n > 0
+
+
+def test_empty_series_still_has_a_datetime_index(store):
+    """A newly launched KPI has no rows before its launch date. The empty result must
+    still carry a DatetimeIndex, or evaluate()'s `series.index < start` raises
+    TypeError against a RangeIndex instead of returning None."""
+    s, _ = store.series("payment_success_rate", {}, date(2025, 8, 1), date(2025, 8, 31))
+    assert isinstance(s.index, pd.DatetimeIndex)
+    assert len(s) == 31
+    assert s.isna().all()
