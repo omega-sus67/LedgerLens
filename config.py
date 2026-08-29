@@ -22,11 +22,34 @@ DIMENSIONS: dict[str, list[str]] = {
     "product": ["A", "B", "C"],
 }
 DRILL_DIMS = ["region", "segment", "payment_rail", "product"]
-METRICS = ["mrr_renewals", "new_logo_bookings"]
+METRICS = ["mrr_renewals", "new_logo_bookings", "payment_success_rate"]
 
 # slice suppression rules (kept realistic, per spec 4.1)
 SEPA_REGIONS = ["DACH", "FR", "Nordics"]
 INVOICE_SEGMENTS = ["Enterprise"]
+
+# ------------------------------------------------- sparse-history KPI (task 3)
+# Its own RNG stream. gen_data draws mrr_renewals, then new_logo_bookings, then
+# tickets from ONE sequential generator, so a third draw on that stream shifts every
+# subsequent value. An isolated stream makes the existing panels bit-identical by
+# construction rather than by luck; tests/test_sparse_kpi.py fingerprints them.
+SEED_SPARSE = 20260816
+
+# Launch date, chosen against the demo's as-of (2026-08-17), NOT against GEN_END.
+# fit_pre_window() requires >= 30 pre-window days. A 14-day manual window ending at
+# as_of starts 2026-08-04, so data must begin by 2026-07-05 for the MANUAL path to
+# work at all. 2026-06-23 gives 55 days to as_of (41 pre-window days -- real margin)
+# and 70 to GEN_END, both far below DETECT_WARMUP_DAYS = 120, so automatic detection
+# still declines. "~45 days" does NOT work: 17 pre-window days, and the manual path
+# fails too, leaving a KPI that can do nothing at all.
+SPARSE_LAUNCH = date(2026, 6, 23)
+
+PSR_BASE_RATE = 0.982  # steady-state authorisation success
+PSR_ATTEMPTS_PER_SLICE_DAY = 140.0  # scale for the denominator
+PSR_NOISE_SD = 0.004  # day-to-day wobble in the rate
+PSR_DIP_START = date(2026, 8, 3)  # the same onset as the SEPA deploy
+PSR_DIP_COHORT = {"region": ["DACH"], "payment_rail": ["sepa"]}
+PSR_DIP_RATE = 0.913  # what the affected cohort falls to
 
 # ---------------------------------------------------------------- anomaly
 MAD_Z_THRESHOLD = 3.5  # robust z on rolling-median residual

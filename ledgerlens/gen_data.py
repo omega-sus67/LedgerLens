@@ -138,6 +138,7 @@ def generate(out_dir: Path | str = config.DATA_DIR) -> dict:
     bookings = raw_logo * august[None, :] * campaign_mult
 
     _write_metrics(out_dir, slices, dates, renewals, bookings)
+    _write_sparse_metric(out_dir, slices)
 
     # --- measured ground truth (never assumed)
     treated_win = renewals[:, in_window].sum()
@@ -162,6 +163,13 @@ def generate(out_dir: Path | str = config.DATA_DIR) -> dict:
         ),
         "n_live_slices": len(slices),
         "n_target_slices": int(is_target.sum()),
+        "sparse_metric": "payment_success_rate",
+        "sparse_launch": config.SPARSE_LAUNCH.isoformat(),
+        "sparse_days_generated": len(
+            pd.date_range(config.SPARSE_LAUNCH, config.GEN_END, freq="D")
+        ),
+        "sparse_dip_cohort": config.PSR_DIP_COHORT,
+        "sparse_dip_onset": config.PSR_DIP_START.isoformat(),
         "decoys": ["campaign_dach_cut", "pricing_us_q3"],
         "must_not_rank_top": ["campaign_dach_cut"],
     }
@@ -193,6 +201,72 @@ def _write_metrics(out_dir, slices, dates, renewals, bookings) -> None:
     df = pd.concat(frames, ignore_index=True)
     df["date"] = pd.to_datetime(df["date"]).dt.date
     df.to_parquet(out_dir / "metrics.parquet", index=False)
+
+
+def _sparse_panels(slices, dates) -> tuple[np.ndarray, np.ndarray]:
+    """payment_success_rate, stored as the two ADDITIVE metrics behind it.
+
+    A rate cannot live in an additive fact table -- SUM(value) across 99 slices would
+    give ~97 -- so we store successes and attempts and let the contract divide them.
+    See docs/sparse_kpi_decisions.md.
+
+    Draws from its OWN RNG stream (config.SEED_SPARSE). Do NOT pass the shared `rng`
+    here: generate() draws renewals, then bookings, then tickets from one sequential
+    stream, and an extra draw would shift everything after it.
+    """
+    rng = np.random.default_rng(config.SEED_SPARSE)
+    n_s, n_d = len(slices), len(dates)
+
+    attempts = np.round(
+        rng.lognormal(math.log(config.PSR_ATTEMPTS_PER_SLICE_DAY), 0.25, size=(n_s, n_d))
+    )
+
+    rate = config.PSR_BASE_RATE + rng.normal(0.0, config.PSR_NOISE_SD, size=(n_s, n_d))
+
+    # The same SEPA connector release, seen through a different KPI. The dip is real
+    # and material, but the metric is too young for the detector to be allowed to find
+    # it -- which is the scenario this KPI exists to demonstrate.
+    hit = np.array([_matches(s, config.PSR_DIP_COHORT) for s in slices])
+    post = np.array([d >= config.PSR_DIP_START for d in dates])
+    rate = np.where(hit[:, None] & post[None, :], config.PSR_DIP_RATE, rate)
+
+    rate = np.clip(rate, 0.0, 1.0)
+    return np.round(attempts * rate), attempts
+
+
+def _write_sparse_metric(out_dir: Path, slices) -> None:
+    """Append the sparse KPI's two physical metrics to metrics.parquet.
+
+    Its date range is SHORTER than the other metrics' on purpose: history begins at
+    config.SPARSE_LAUNCH, well below DETECT_WARMUP_DAYS, so detect() declines and the
+    card has to say why.
+    """
+    dates = pd.date_range(config.SPARSE_LAUNCH, config.GEN_END, freq="D").date.tolist()
+    successes, attempts = _sparse_panels(slices, dates)
+    n_d = len(dates)
+
+    frames = []
+    for name, panel in (("payment_successes", successes), ("payment_attempts", attempts)):
+        frames.append(
+            pd.DataFrame(
+                {
+                    "date": np.tile(dates, len(slices)),
+                    "metric_name": name,
+                    "region": np.repeat([s[0] for s in slices], n_d),
+                    "segment": np.repeat([s[1] for s in slices], n_d),
+                    "payment_rail": np.repeat([s[2] for s in slices], n_d),
+                    "product": np.repeat([s[3] for s in slices], n_d),
+                    "value": panel.reshape(-1),
+                }
+            )
+        )
+    df = pd.concat(frames, ignore_index=True)
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+
+    existing = pd.read_parquet(out_dir / "metrics.parquet")
+    pd.concat([existing, df], ignore_index=True).to_parquet(
+        out_dir / "metrics.parquet", index=False
+    )
 
 
 # ---------------------------------------------------------------------- events

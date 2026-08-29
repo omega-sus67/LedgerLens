@@ -4,6 +4,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+import pandas as pd
+
 import config
 from ledgerlens.gen_data import live_slices
 
@@ -71,8 +73,24 @@ def test_ticket_spike_is_half_prose(store):
 
 
 def test_fact_table_loaded(store):
+    """Two full-history metrics over the whole span, plus the sparse KPI's two
+    physical metrics over its shorter one. The sparse KPI's date range is DELIBERATELY
+    different -- that is the "different historical coverage" scenario, not a bug."""
+    full_days = len(pd.date_range(config.GEN_START, config.GEN_END, freq="D"))
+    sparse_days = len(pd.date_range(config.SPARSE_LAUNCH, config.GEN_END, freq="D"))
     n = store.con.execute("SELECT count(*) FROM fact_metric").fetchone()[0]
-    assert n == 99 * 549 * 2
+    assert n == 99 * full_days * 2 + 99 * sparse_days * 2
+
+
+def test_sparse_metrics_are_shorter_than_the_established_ones(store):
+    """The point of the KPI: it has less history than the others, on purpose."""
+    rows = dict(
+        store.con.execute(
+            "SELECT metric_name, count(DISTINCT date) FROM fact_metric GROUP BY 1"
+        ).fetchall()
+    )
+    assert rows["payment_attempts"] < rows["mrr_renewals"]
+    assert rows["payment_successes"] == rows["payment_attempts"]
 
 
 def test_package_never_reads_ground_truth():
