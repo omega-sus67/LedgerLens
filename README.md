@@ -6,6 +6,10 @@ Dashboards tell you *what* moved. Finding out *why* takes an analyst days across
 
 Built for the Accenture Innovation Challenge 2026, problem statement 3.
 
+> **New here?** [`docs/how_it_works.md`](docs/how_it_works.md) explains the whole system
+> from zero -- no analytics background assumed. Everything below assumes the vocabulary
+> it teaches.
+
 ---
 
 ## Read this first: what this does and does not claim

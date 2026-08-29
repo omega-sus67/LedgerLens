@@ -1,5 +1,10 @@
 # `contracts.py` — decisions, jargon, and implementation, end to end
 
+> **New to the project?** Read **[how_it_works.md](how_it_works.md)** first -- it
+> assumes no background at all and teaches the vocabulary this page uses freely
+> (cohort, grain, blast radius, lineage, `Store.q()`). This document explains
+> *decisions*; that one explains the *system* those decisions are about.
+
 Read this beside [`ledgerlens/contracts.py`](../ledgerlens/contracts.py). It explains
 every model, every field, and — the reason it exists — **why each decision went the way
 it did**, including the things the contract deliberately refuses to do.
