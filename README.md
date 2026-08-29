@@ -114,6 +114,51 @@ The omission rule matters as much as the mapping: a dimension the source does no
 
 ---
 
+## Three KPIs, and one that refuses to answer
+
+LedgerLens carries three KPIs across three source systems on different cadences:
+
+| KPI | Unit | Aggregation | Source | Cadence | History |
+|---|---|---|---|---|---|
+| `mrr_renewals` | USD/day | sum | CRM | daily batch, 02:00 UTC | full |
+| `new_logo_bookings` | USD/day | sum | CRM | daily batch, 02:00 UTC | full |
+| `payment_success_rate` | rate | **ratio** | PSP webhook | every 15 minutes | **56 days** |
+
+The third one is the interesting one, and it is deliberately broken in a specific way.
+
+**It is too young to detect on.** 56 days of history against a 120-day warmup, so
+`detect()` returns `None` before it looks at a single value. The card does not render a
+blank success box — it says what it lacks and asks for a window:
+
+> **Insufficient history for automatic detection.** `payment_success_rate` launched
+> 2026-06-23 — 56 days of history against a 120-day warmup. Detection is declined
+> rather than run on a baseline that cannot support it.
+
+Supply the window and the full chain still runs: the same SEPA connector release is
+found through a second KPI at `C = 1.00`, both negative controls pass, and support
+tickets corroborate at 10× lift. **Declining to detect is not declining to help.**
+
+**It is a rate, and rates are not additive.** `fact_metric` has one `value` column, so
+the KPI is stored as two additive metrics — `payment_successes` and `payment_attempts` —
+and the contract declares `agg="ratio"`. `Store.series()` then issues
+`SUM(numerator)/SUM(denominator)`: a *weighted* rate, where a slice with 4,000 attempts
+counts more than one with 4. An unweighted average across slices would be a different
+and wrong number.
+
+Two consequences we state rather than hide:
+
+- **The drill-down is switched off for ratio KPIs.** Contribution analysis assumes a
+  parent's delta is the sum of its children's. A rate is a mix effect plus a
+  within-slice effect, and separating them needs a method this build does not have.
+- **No seasonality is claimed.** The KPI has no prior August, so the card says *"no
+  seasonal adjustment is applied"* rather than reporting a confident 0.0%.
+
+It also gets its own alerting thresholds — a rate living at 98.2% cannot fall 3%, so the
+global gate would make it undetectable in principle. Full reasoning in
+[`docs/sparse_kpi_decisions.md`](docs/sparse_kpi_decisions.md).
+
+---
+
 ## Two audiences, identical evidence
 
 Dashboards fail different readers differently: an analyst-shaped card is useless to a

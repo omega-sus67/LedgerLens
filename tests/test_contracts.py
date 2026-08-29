@@ -13,7 +13,7 @@ import pytest
 from pydantic import ValidationError
 
 import config
-from ledgerlens import contracts
+from ledgerlens import contracts, pipeline
 from ledgerlens.contracts import AccessRule, KpiContract, LineageStep, Thresholds
 
 AS_OF = date(2026, 8, 17)
@@ -281,3 +281,14 @@ def test_calculation_sql_reproduces_the_engine_series(store, metric):
     assert not df.empty
     assert len(df) == len(series)
     assert df["value"].to_numpy() == pytest.approx(series.to_numpy())
+
+
+def test_freshness_measures_a_ratio_kpi_through_its_source_metrics(store):
+    """A ratio KPI has no rows under its own name. Without the source_metrics
+    mapping the freshness panel reports its feed as never seen while it is current --
+    a governance panel that is confidently wrong is worse than no panel."""
+    rows = contracts.freshness(store, "payment_success_rate", pipeline.DEFAULT_AS_OF)
+    metric_step = next(r for r in rows if r.kind == "metric")
+    assert metric_step.source_system == "psp_webhook"
+    assert metric_step.last_seen is not None
+    assert metric_step.lag_days is not None and metric_step.lag_days >= 0

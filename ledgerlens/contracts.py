@@ -462,7 +462,10 @@ def freshness(store: "Store", metric: str, as_of: date) -> list[SourceFreshness]
         sql = _FRESHNESS_SQL[step.kind]
         params: dict = {"as_of": as_of}
         if step.kind == "metric":
-            params["metric"] = metric
+            # A ratio KPI has no rows under its own name -- fact_metric holds its
+            # numerator and denominator instead. Without this the freshness panel
+            # reports the KPI's own feed as never seen while it is in fact current.
+            params["metric"] = contract.source_metrics[-1]
         elif step.kind == "context":
             params["source"] = step.source_system
 

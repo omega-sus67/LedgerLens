@@ -102,6 +102,15 @@ cache work (the expander renders outside `load()`), so this is still unpaid.
   invocations with `env -u PYTHONPATH -u VIRTUAL_ENV` or `pytest`/imports can fail
   mysteriously (e.g. `yaml` import errors) — this is also why `contracts.py` uses
   Pydantic instead of a YAML file, on purpose.
+- **`gen_data.py` uses ONE sequential RNG stream.** Any new generated series MUST
+  take its own `np.random.default_rng(SEED_*)`, or every downstream draw shifts and
+  the acceptance numbers drift inside their band -- green tests, wrong demo.
+  `tests/test_sparse_kpi.py`'s fingerprint tests enforce this. If they fail, fix the
+  generator, NEVER update the hash.
+- **A KPI's aggregation lives in its contract, not in the engine.** `agg="sum"` vs
+  `agg="ratio"` and `source_metrics` (the physical `metric_name` rows behind a KPI)
+  are read by `Store.series`, `Store.cohort_rows` and `contracts.freshness`. Adding a
+  ratio KPI without wiring all three silently zeroes the C component for that KPI.
 - **Tests before claims.** Any refactor of `anomaly.py`/`hypothesis.py`/
   `controls.py` should be checked against a before/after characterization
   snapshot in addition to `pytest -q`, because the test suite doesn't exercise

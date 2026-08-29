@@ -210,7 +210,14 @@ the whole claim, machine-checked.
 
 ---
 
-## Task 3 — Third KPI with sparse history
+## Task 3 — Third KPI with sparse history  ✅ DONE
+
+> Landed 2026-08-29. 181 tests. Plan: [`task_sparse_kpi.md`](task_sparse_kpi.md);
+> decisions: [`docs/sparse_kpi_decisions.md`](../docs/sparse_kpi_decisions.md).
+> **Two corrections to the spec below:** the KPI is a RATIO, which needed
+> `Store.series`, `Store.cohort_rows` and `evaluate()` to become aggregation-aware
+> (~5h, not 3h); and "~45 days" does NOT work -- it leaves 17 pre-window days, below
+> `fit_pre_window`'s 30-day floor, so the MANUAL path fails too. Launch is 2026-06-23.
 
 **Goal:** one change covers two checklist rows — lifts us to 3 KPIs *and* produces the
 sparse-history scenario.
