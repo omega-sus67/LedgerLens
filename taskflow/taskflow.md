@@ -1,463 +1,559 @@
 # LedgerLens — Task Flow
 
-Implementation detail for every remaining item before the **Aug 30** submission.
-Written **Aug 28** against the repo as it stands, superseding the schedule in
-`improvements.md` (which assumed Aug 26–27 work that did not land).
+Everything still standing between here and the **Aug 30** submission. Rewritten
+**Aug 29** after tasks 1–3 landed, and **cut down to essentials only** — the original
+twelve-task list is no longer achievable in the time left, so this file now carries the
+four tasks that close real rubric rows plus one conditional, and states plainly what was
+dropped and why.
 
 Purpose: something the team can read, argue with, and split up. Each task below is
-self-contained — goal, the brief row it closes, files touched, subtasks, how it is
+self-contained — goal, the rubric row it closes, files touched, subtasks, how it is
 tested, and what could go wrong.
 
 ---
 
 ## 0. Where the repo actually is
 
-**Verified Aug 28.** 96 tests pass. Repo is **public**
-(`gh repo view` → `"visibility":"PUBLIC"`). `details/` (contest PDFs) is correctly
-untracked.
+**Verified Aug 29.** `env -u PYTHONPATH -u AMENT_PREFIX_PATH .venv/bin/python -m pytest -q`
+→ **182 passed**.
 
-Since `improvements.md` was written, exactly one thing landed, and only its back half:
+Landed since this file was first written:
 
-- `ledgerlens/contracts.py` — new, untracked. Complete and well-built: `KpiContract`,
-  `LineageStep`, `AccessRule`, `Thresholds`, `CONTRACTS` for both KPIs, plus
-  `get()` / `thresholds()` / `hidden_dims_for()` / `visible_drill_dims()`.
-- `ledgerlens/anomaly.py` — modified. `scan_for_onset()` now takes a `Thresholds`,
-  and `detect()` / `drill()` pass `contracts.thresholds(metric)`.
+| Task | Closed | Record |
+|---|---|---|
+| **1 — KPI semantic contract** ✅ | contract, grains/cadences, freshness, lineage | [`docs/contracts_decisions.md`](../docs/contracts_decisions.md) |
+| **2 — Personas + `Action` reshape** ✅ | persona narratives, levers/decision rights, confidence | [`docs/persona_decisions.md`](../docs/persona_decisions.md) · [`task_persona.md`](task_persona.md) |
+| **3 — Third KPI, sparse history** ✅ | 3 KPIs / 3 sources, sparse-history scenario, ratio aggregation | [`docs/sparse_kpi_decisions.md`](../docs/sparse_kpi_decisions.md) · [`task_sparse_kpi.md`](task_sparse_kpi.md) |
 
-But `contracts.py` has **no UI surface and no tests**, and `visible_drill_dims()` is
-called by nothing. Housekeeping that also landed: streamlit pinned `<1.63`,
-`test_app.py` given an absolute path.
+### The three things that will bite us
 
-### Two things that will bite us
+1. **Nothing is pushed. The remote is still at Aug 16.** 13 commits ahead, and the
+   branches are stacked and unmerged: `task-3-sparse-kpi` → `task-2-personas` → `main`.
+   The deliverable is *"Public GitHub repository, including a prototype demo video and a
+   README"* — so the repo is not where the work lives, it **is** a graded artifact.
+   Right now the public repo contains none of tasks 1–3. **This is Task 0 and it comes
+   before any feature work.**
 
-1. **`.gitignore` now contains `*.md`.** The three existing docs
-   (`README.md`, `IMPLEMENTATION_SPEC.md`, `businessintelligence-ai-redesign.md`) are
-   already tracked so they still commit — but every **new** markdown file is silently
-   ignored. **This file included.** Fix before writing the business proposal:
+2. **The README's test count is a claim, and it is now false.** `README.md:46` and
+   `README.md:268` both say `126 tests`; `CLAUDE.md:20` says the same. It is 182. On a
+   project whose entire pitch is that its numbers are checkable, a judge who runs the
+   suite and sees a different number has found the one kind of error that costs more
+   than it should.
 
-   ```gitignore
-   *.md
-   !README.md
-   !taskflow/*.md
-   !docs/*.md
-   ```
-
-   Verify with `git check-ignore -v taskflow/taskflow.md`.
-
-2. **Nothing since Aug 16 is pushed.** `pushedAt` is `2026-08-16`. All of
-   `contracts.py` and the anomaly wiring is uncommitted local work — one lost laptop
-   from being gone.
+3. **`config.py:123` — `MODEL = "claude-sonnet-4-6"` is not a valid model id.** Should
+   be `claude-sonnet-5`. One line. A judge who knows the API will notice, and it is the
+   cheapest credibility point on the board.
 
 ### Running the tests on this machine
 
-The ROS 2 install poisons `PYTHONPATH`. Without stripping it, pytest dies at
-collection with `ModuleNotFoundError: No module named 'yaml'`:
+The ROS 2 install poisons `PYTHONPATH`. Without stripping it, pytest dies at collection
+with `ModuleNotFoundError: No module named 'yaml'`:
 
 ```bash
 env -u PYTHONPATH -u AMENT_PREFIX_PATH .venv/bin/python -m pytest -q
 ```
 
-Worth adding to `CLAUDE.md`.
+---
+
+## What the rubric actually asks
+
+The brief has **two** lists and they are not equally weighted. *Minimum Prototype
+Expectations* is the concrete checklist a judge ticks — a missing row is a zero, not a
+deduction. *Round 2 Objectives* and *Real-World Complexities* reward depth, but no
+single one of them is fatal. The cut below follows that distinction.
+
+| # | Minimum Prototype Expectation | Status |
+|---|---|---|
+| 1 | Three to five connected KPIs across two or three data sources with different grains or refresh cadences | ✅ Task 3 |
+| 2 | A lightweight KPI or semantic contract covering definitions, calculations, drivers, thresholds, lineage and access restrictions | ✅ Task 1 |
+| 3 | At least two personas receiving different insight narratives or recommended actions | ✅ Task 2 — four |
+| 4 | One multi-factor KPI movement with known or simulated underlying drivers | ✅ seasonality + deploy + campaign decoy, decomposed on the card |
+| 5 | One low-confidence scenario in which the engine requests clarification or abstains | ✅ Task 3 declines detection and asks for a window · **hardened by Task 7** |
+| 6 | One sparse-history or newly launched KPI scenario | ✅ Task 3 |
+| 7 | One role-based security or entitlement scenario | ❌ **Task 4** |
+| 8 | Evidence showing source freshness, analytical method, contribution, confidence and lineage | ✅ Tasks 1 + 2 |
+| 9 | A clear breakdown of LLM versus non-LLM processing | ⚠️ README only — **Task 6** puts it where judges look |
+| 10 | Runtime telemetry covering latency, model calls, token usage and estimated cost | ❌ **Task 6** |
+
+**Seven of ten already close.** Two tasks close the remaining three rows.
 
 ---
 
 ## Task order
 
-Ordered so each task unblocks the next, not by the P0/P1 tiers in `improvements.md`.
-Items 1–7 are literal rows on the judges' Minimum Prototype Expectations list.
-
 | # | Task | Closes | Est. |
 |---|---|---|---|
-| 1 | Finish the KPI semantic contract | contract, grains/cadences, freshness | 2h |
-| 2 | Personas + `Action` schema reshape | persona narratives, levers/decision rights | 3h |
-| 3 | Third KPI with sparse history | 3–5 KPIs, sparse-history scenario | 3h |
-| 4 | Role-based entitlement | security/entitlement scenario | 1–2h |
-| 5 | Learning-loop UI | learns from feedback | 2h |
-| 6 | Telemetry panel | latency/cost, LLM vs non-LLM in the UI | 1–2h |
-| 7 | Abstention demo path | abstains when evidence insufficient | 1h |
-| 8 | Model-id fix + one real LLM call | model choice & cost reasoning | 3h |
-| 9 | `effect.py` — diff-in-diff + bootstrap CI | materiality as stat + business impact | 3h |
-| 10 | Ingest `slack.json` | heterogeneous sources | 2h |
-| 11 | `ambiguity.py` — discriminating test | uncertainty handling | 3h |
-| 12 | Submission package | repo, README, video, proposal | 4h |
+| 0 | Merge, correct the claims, push | the *repository* deliverable | 30m |
+| 4 | Role-based entitlement | MPE row 7 | 1.5h |
+| 6 | Telemetry panel | MPE rows 9 **and** 10 | 1.5h |
+| 7 | Abstention demo path | hardens MPE row 5 | 1h |
+| 12 | Submission package | proposal · video · README · repo | 4h |
+| 5 | Learning-loop UI *(conditional)* | Objective 7 — **only if 12 is done** | 2h |
 
-**Cut line if behind:** drop 11, then 10, then 9, then 8. Never drop 1–7 — those are
-checklist rows, and a missing checklist row is a zero, not a deduction.
+**Cut line if behind:** drop 5, then the P2 items inside 12 (charts, watchtower
+landing). **Never drop 0 or 12** — those are deliverables, not features, and a missing
+deliverable is a different order of failure from a missing feature.
 
 ---
 
-## Task 1 — Finish the KPI semantic contract
+## Task 0 — Merge, correct the claims, push
 
-**Goal:** `contracts.py` stops being dead metadata and becomes a visible, tested,
-judge-facing surface. Closes three brief rows at once: the contract itself,
-"different grains / refresh cadences", and "evidence: freshness … lineage".
+**Goal:** make the public repo contain the work. Everything else is worthless if this
+does not happen, and it is the only task with no technical risk.
 
-**Files:** `ledgerlens/contracts.py`, `app.py`, `tests/test_contracts.py` (new),
-`tests/test_app.py`
+**Files:** `README.md`, `CLAUDE.md`, `config.py`, git
 
-### 1.1 — `tests/test_contracts.py`
+### 0.1 — Land the stack
 
-New file. Follow the house style: plain asserts, docstring says *why* the test exists.
+Both feature branches are green and stacked. Merge in order, fast-forward:
 
-- every name in `config.METRICS` has an entry in `CONTRACTS`
-- `Thresholds()` field-by-field equals the `config` constants. **This is the important
-  one** — it is the invariant the already-landed `anomaly.py` refactor rests on
-  ("every default is exactly the global constant, so an unset field can never change
-  detection behaviour"), and right now nothing guards it
-- the `grain_dims` and `AccessRule.hidden_dims` validators raise on an unknown dim
-- `visible_drill_dims("growth")` on `mrr_renewals` drops `payment_rail`;
-  an unknown role returns all of `config.DRILL_DIMS` (fail-open, as documented)
-- `get("nope")` raises `KeyError`; `thresholds("nope")` returns defaults
-- every `related_event_types` entry is an `event_type` that actually appears in the
-  generated ledger — guards contract drift against `gen_data.py`
+```bash
+git checkout main
+git merge --ff-only task-2-personas
+git merge --ff-only task-3-sparse-kpi
+env -u PYTHONPATH -u AMENT_PREFIX_PATH .venv/bin/python -m pytest -q   # must be 182
+```
 
-### 1.2 — `contracts.freshness(store, metric, as_of)`
+### 0.2 — Make the claims true again
 
-New function. For each `LineageStep`, report the newest data actually present versus
-`as_of`, so the UI shows **measured** freshness beside the **declared**
-`refresh_cadence`. Reuses the existing store API and schema:
+- `README.md:46` and `README.md:268` — `126 tests` → the real number.
+- `CLAUDE.md:20` — same, plus update the "current state" block: tasks 1–3 are done.
+- `config.py:123` — `MODEL = "claude-sonnet-4-6"` → `"claude-sonnet-5"`.
 
-- `kind="metric"` → `store.max_date(metric)` (store.py:200)
-- `kind="context"` → `SELECT max(ts_start) FROM change_event WHERE source = $s`
-- `kind="symptom"` → `SELECT max(created_at) FROM ticket`
+Add a test so the count cannot rot again:
 
-Return a frozen model: `source_system`, `declared_cadence`, `last_seen`, `lag_days`,
-`kind`. Issue through `store.q()` so freshness numbers are query-logged like every
-other number on the page and show up in `pipeline.card_query_ids()`.
+```python
+# tests/test_docs.py
+from pathlib import Path
 
-**Decide:** freshness relative to `as_of`, not today. The demo is a time-travel replay
-pinned at `DEFAULT_AS_OF = 2026-08-17`; measuring against the wall clock would print
-"1181 days stale" on stage.
+import config
 
-### 1.3 — "📜 Contract" expander in `app.py`
 
-Collapsed `st.expander`, placed directly after the focal-cohort `st.caption(...)` and
-before the first `st.divider()`. Contents:
+def test_readme_test_count_is_true():
+    """The README's numbers are the product's credibility. A count that drifts is the
+    one error that costs more than the thing it misstates."""
+    import re
+    import subprocess
 
-- definition, unit, owner, status
-- `calculation_sql` via `st.code(..., language="sql")`
-- known drivers, as bullets
-- thresholds table — the values in force **for this KPI**
-- lineage table: source → artifact → table → grain → declared cadence → measured
-  freshness (1.2)
-- access policies: `policy_id`, role, hidden dims, reason
+    out = subprocess.run(
+        ["env", "-u", "PYTHONPATH", "-u", "AMENT_PREFIX_PATH",
+         ".venv/bin/python", "-m", "pytest", "--collect-only", "-q"],
+        capture_output=True, text=True, cwd=config.ROOT,
+    ).stdout
+    actual = int(re.search(r"(\d+) tests? collected", out).group(1))
+    claimed = {int(m) for m in re.findall(r"(\d+) tests", Path("README.md").read_text())}
+    assert claimed == {actual}, f"README claims {claimed}, suite has {actual}"
+```
 
-Use `contracts.get(metric)` (strict) so an ungoverned KPI fails loudly instead of
-rendering an empty box.
+> Guard against recursion: this test shells out to `--collect-only`, which does not run
+> the suite. Do **not** call `pytest` proper from inside a test.
 
-Also switch the sidebar "Thresholds" panel from bare `config.*` constants to
-`contracts.thresholds(metric)` — two lines, and it makes the contract visibly *in
-force* rather than decorative.
+### 0.3 — Push
 
-### 1.4 — Extend `tests/test_app.py`
+```bash
+git push -u origin main
+gh repo view --json visibility   # must be PUBLIC
+```
 
-Against the existing module-scoped `app` fixture: the expander renders, the
-calculation SQL appears, the freshness column carries a real number.
+**Test:** `git log origin/main -1` is today's commit; a fresh `git clone` into `/tmp`
+plus the README's documented install steps reproduces the diagnosis card.
 
-**Risk:** the `st.cache_resource` on `load()` keys on `(metric, as_of)` only. Anything
-added later that changes rendering (persona, role, toggles) must join that cache key
-or the UI will serve stale cards. Flagged here because Tasks 2, 4, 5 and 7 all hit it.
-
----
-
-## Task 2 — Personas + `Action` schema  ✅ DONE
-
-> Landed 2026-08-29. Four personas, 160 tests. Implementation plan:
-> [`taskflow/task_persona.md`](task_persona.md); decisions:
-> [`docs/persona_decisions.md`](../docs/persona_decisions.md).
-> **Task 4 is now unblocked** — `Persona.role` is live and joins
-> `contracts.AccessRule.role`; task 4 is the wiring plus a test, and must add
-> `role` to `app.py`'s `load_payload` cache key.
-
-**Goal:** two audiences, *identical evidence*. That sentence is the pitch to judges:
-"different narratives, same `query_id`s."
-
-**Files:** `ledgerlens/models.py`, `ledgerlens/narrate.py`, `app.py`, `tests/`
-
-### 2.1 — Reshape `Action` (models.py:269)
-
-Currently `priority / owner / action / basis`. The brief wants
-`driver → controllable lever → action → expected impact → owner → confidence →
-monitoring plan`. Add `lever: str`, `expected_impact: str`, `confidence: float`,
-`monitoring: str`. Keep `basis` — it carries the `query_id` and is the traceability
-hook.
-
-All four construction sites are in `narrate.py` (≈183, 192, 209, 275). Existing
-`OWNER_BY_SOURCE` already supplies `owner`.
-
-### 2.2 — Persona templates in `narrate.py`
-
-`narrate()` gains a `persona` argument; `_cause_card` / `_no_cause_card` branch on it.
-The narrator is already template-based, so this is a second template, not new
-machinery.
-
-- **CFO** — headline in dollars, seasonality-adjusted, one action, monitoring plan, no
-  SQL jargon, no event ids in prose.
-- **Payments on-call** — event id first, blast radius, affected rail, rollback as the
-  P0 action, full control table.
-- **Analyst** (default) — today's card, unchanged.
-
-`NarrationPayload` is unchanged; only rendering differs. That is the property the
-tests should assert.
-
-### 2.3 — Sidebar selector + tests
-
-`st.sidebar.selectbox("Persona", ...)`, threaded into `load()`'s cache key.
-
-Test: for the same `(metric, as_of)`, the CFO and on-call cards have **different
-summary text** but **identical `pipeline.card_query_ids()`**. That single assertion is
-the whole claim, machine-checked.
-
----
-
-## Task 3 — Third KPI with sparse history  ✅ DONE
-
-> Landed 2026-08-29. 181 tests. Plan: [`task_sparse_kpi.md`](task_sparse_kpi.md);
-> decisions: [`docs/sparse_kpi_decisions.md`](../docs/sparse_kpi_decisions.md).
-> **Two corrections to the spec below:** the KPI is a RATIO, which needed
-> `Store.series`, `Store.cohort_rows` and `evaluate()` to become aggregation-aware
-> (~5h, not 3h); and "~45 days" does NOT work -- it leaves 17 pre-window days, below
-> `fit_pre_window`'s 30-day floor, so the MANUAL path fails too. Launch is 2026-06-23.
-
-**Goal:** one change covers two checklist rows — lifts us to 3 KPIs *and* produces the
-sparse-history scenario.
-
-**Files:** `ledgerlens/gen_data.py`, `config.py`, `ledgerlens/contracts.py`,
-`ledgerlens/pipeline.py`, `app.py`
-
-- Add `payment_success_rate` to the generator with **~45 days** of history — below
-  `config.DETECT_WARMUP_DAYS`, deliberately.
-- Add to `config.METRICS` and give it a `KpiContract` with
-  `status="sparse_history"`. A rate metric bounded near 98% needs its own
-  `min_abs_delta_pct` — the contract's per-KPI thresholds exist precisely for this.
-- `scan_for_onset()` already returns `None` when `len(s) < th.warmup_days`, so
-  detection declines on its own. The work is making the *decline* legible: the card
-  must say **"insufficient history for automatic detection — manual window analysis
-  only, wider uncertainty"** rather than rendering a blank success box.
-- `pipeline.run()` already supports the manual path (`cohort` + `window` bypass
-  detection). Expose it in the UI for sparse KPIs.
-
-**Test:** `detect()` returns `None` for the sparse KPI; the manual path still produces
-a full card; the UI shows the insufficient-history banner.
-
-**Risk:** the biggest task on the list. `gen_data.py` is ~500 lines of carefully
-seeded generation and `ground_truth.json` must stay consistent. Do not let a new
-metric perturb the existing series — the acceptance test in `test_pipeline.py`
-asserts the exact incident and the exact decoy.
+**Risk:** none technical. The risk is that it keeps getting deferred behind feature
+work. It is Task 0 for that reason.
 
 ---
 
 ## Task 4 — Role-based entitlement
 
 **Goal:** redaction *with provenance* — the auditability story the rest of the system
-already tells.
+already tells. Closes MPE row 7, the only uncovered row.
 
-**Files:** `app.py`, `ledgerlens/pipeline.py`, `ledgerlens/anomaly.py` (probably not)
+**Files:** `ledgerlens/pipeline.py`, `app.py`, `tests/test_entitlement.py`
 
-The machinery exists. `contracts.visible_drill_dims(role)` returns `DRILL_DIMS` minus
-policy-hidden dims, and `anomaly.drill(store, root, dims)` already takes a `dims`
-list — `pipeline.run()` just needs to pass the role-filtered list instead of
-`config.DRILL_DIMS`.
+The machinery all exists, and Task 2 wired the last missing piece:
 
-The visible part is the **honest refusal**: the card must show
+- `contracts.visible_drill_dims(role)` returns `DRILL_DIMS` minus policy-hidden dims
+- `anomaly.drill(store, root, dims)` already takes a `dims` list
+- `AccessRule(policy_id="fin.rail_detail", role="growth", hidden_dims=["payment_rail"])`
+  is already declared on the `mrr_renewals` contract
+- **`Persona.role` is live** and `test_growth_role_matches_the_contract_access_rule`
+  already joins the persona registry to the contract's roles
+
+### 4.1 — Thread the role into drill
+
+[`pipeline.py:60`](../ledgerlens/pipeline.py#L60) currently passes the global list:
+
+```python
+nodes = anomaly.drill(store, root, config.DRILL_DIMS)
+```
+
+`diagnose()` gains `role: str | None = None`, and:
+
+```python
+    dims = (
+        contracts.get(metric).visible_drill_dims(role)
+        if role is not None
+        else config.DRILL_DIMS
+    )
+    nodes = anomaly.drill(store, root, dims)
+```
+
+### 4.2 — Redact visibly, never silently
+
+The point is the **honest refusal**. Return what was withheld and why, so the card can
+say it. Add to `NarrationPayload`:
+
+```python
+    redactions: list[tuple[str, str, str]] = field(default_factory=list)  # (dim, policy_id, reason)
+```
+
+`NarrationPayload` is a `@dataclass`, not a pydantic model, so this needs
+`from dataclasses import dataclass, field` at the top of `narrate.py`, and the field
+must come after the existing defaulted `no_confident_cause`.
+
+populated in `diagnose()` from `contracts.get(metric).access` for the caller's role.
+`_cause_card` renders one line per redaction:
 
 > 2 deeper slices redacted by policy `fin.rail_detail` — payment-rail revenue splits
-> are finance-restricted
+> are finance-restricted; growth sees region and segment cuts only.
 
-with the policy id and reason pulled from the `AccessRule`, *not* silently drop rows.
-The existing contract already carries `fin.rail_detail` hiding `payment_rail` from
-`growth`.
+Policy id and reason come from the `AccessRule`, never hardcoded.
 
-Ties to Task 2: role comes from the persona selector.
+### 4.3 — Wire it to the persona selector
 
-**Test:** with role `growth`, no returned node's cohort contains a `payment_rail` key;
-the redaction notice names the policy id.
+`app.py` already has `who = personas.get(persona_id)`. Pass `who.role` into
+`load_payload`, **and add it to the cache key** — entitlement changes which dims are
+drilled, so it changes the payload. This is the half of the cache-key debt
+[`docs/persona_decisions.md`](../docs/persona_decisions.md) §10 explicitly left unpaid,
+and the docstring on `load_payload` says so.
 
----
+**Test** (`tests/test_entitlement.py`):
 
-## Task 5 — Learning-loop UI
+```python
+def test_growth_never_sees_a_payment_rail_cut(store):
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store, role="growth")
+    assert all("payment_rail" not in n.cohort for n in payload.nodes)
 
-**Goal:** prove objective #7 on camera — a click that moves a number.
 
-**Files:** `app.py`, `tests/`
+def test_analyst_still_sees_every_cut(store):
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store, role="analyst")
+    assert any("payment_rail" in n.cohort for n in payload.nodes)
 
-`learning.record()` and the `verdict` table already exist and are unused.
 
-- Confirm / Reject / Correct buttons on each hypothesis card in `render_hypothesis()`
-- on click: `learning.record(...)` → `st.cache_resource.clear()` → `st.rerun()`
-- `learning.prior()` counts `verdict` rows at read time, so the **P** component moves
-  with no other wiring: Beta(1,1)=0.50 → one confirm → Beta(2,1)=**0.67**
+def test_redaction_names_its_policy(store):
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store,
+                        persona=personas.get("growth"))
+    assert "fin.rail_detail" in card.summary or any(
+        "fin.rail_detail" in s.claim for s in card.causal_chain
+    )
 
-Show the before/after explicitly next to the P bar. That is a 15-second video beat.
 
-**Risk:** `verdict` rows persist in `data/ledgerlens.duckdb`. Repeated demo clicks will
-drift the priors away from the numbers in the README and in `test_app.py`
-(`scores[0] == "0.700"`). Need a "reset feedback" control, or delete the db before
-recording. **Decide this before the video.**
+def test_redaction_does_not_change_the_ranking_inputs(store):
+    """Entitlement hides CUTS, not rows. The candidate set and their scores must be
+    identical -- a policy that silently changed the answer would be a security hole
+    dressed as a feature."""
+    a = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store, role="analyst")
+    g = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store, role="growth")
+    assert [h.event.event_id for h in a.ranked] == [h.event.event_id for h in g.ranked]
+```
+
+**Risk:** the focal cohort is currently `DACH · Enterprise · sepa`. Hiding
+`payment_rail` from `growth` changes which cohort becomes focal, which changes the
+headline number on that persona's card. That is **correct** — they are entitled to a
+shallower answer — but it will look like a bug on stage if nobody says so. The
+redaction line is what makes it read as policy rather than breakage. Do not skip it.
 
 ---
 
 ## Task 6 — Telemetry panel
 
 **Goal:** the runtime-constraints row, and it doubles as the LLM-vs-non-LLM breakdown
-*in the UI* where judges see it (today it is only in the README).
+**in the UI**, where judges look — today that claim lives only in the README. Closes
+two MPE rows for one task's work.
 
-**Files:** `ledgerlens/pipeline.py`, `app.py`
+**Files:** `ledgerlens/pipeline.py`, `ledgerlens/models.py`, `app.py`
 
-- wrap each `pipeline.run()` stage in `time.perf_counter()` — detect, drill, symptoms,
-  rank, narrate — and return the timings on the card
-- count registered queries: `len(pipeline.card_query_ids(card))`
-- LLM calls and tokens: **0** in offline mode. Say so plainly and turn it into a
-  strength: *"this diagnosis: 0 LLM calls, $0.000 — every number came from a logged
-  SQL query. With the narrator enabled: 1 call, ~2.1k tokens, ~$0.01."*
+### 6.1 — Time the stages
 
-One `st.expander("⏱ telemetry")`. `tests/test_pipeline.py:130` already uses
-`perf_counter` for a latency assertion — same pattern.
+`diagnose()` already runs five distinct phases: detect, drill, symptoms, rank,
+seasonal. Wrap each in `time.perf_counter()` and collect into a dict. Add to
+`NarrationPayload` and carry through to `DiagnosisCard`:
+
+```python
+class Telemetry(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    stage_ms: dict[str, float]
+    total_ms: float
+    queries: int         # len(pipeline.card_query_ids(card))
+    llm_calls: int = 0
+    llm_tokens: int = 0
+    llm_cost_usd: float = 0.0
+```
+
+`DiagnosisCard` gains `telemetry: Telemetry | None = None` (pydantic, frozen, so a
+default keeps every existing construction site valid), and `_cause_card` /
+`_no_cause_card` pass `payload.telemetry` straight through — narration must not
+recompute it, for the same reason it recomputes no other number.
+
+`tests/test_pipeline.py:130` already uses `perf_counter` for a latency assertion —
+same pattern, do not invent a second one.
+
+> `queries` cannot be filled inside `diagnose()`: `card_query_ids()` needs the finished
+> card. Count it in `narrate()` where the card is assembled, or leave it `0` in the
+> payload and set it via `model_copy` at the end of `_cause_card`.
+
+### 6.2 — Render it, and make the zero the point
+
+```python
+with st.expander("⏱ Telemetry — latency, model calls, cost"):
+```
+
+Show the stage breakdown as a table, then the sentence that turns the zero into a
+claim rather than an absence:
+
+> **This diagnosis: 0 LLM calls, 0 tokens, $0.0000.** Every number on this page came
+> from a logged SQL query with a replayable `query_id`. The ranking path is
+> deterministic Python and SQL by design, not by omission — which is why the full test
+> suite and the entire demo run with `ANTHROPIC_API_KEY` unset.
+
+Then the honest counterfactual, so it does not read as dodging the question:
+
+> With the optional LLM narrator enabled, narration alone would add ~1 call and
+> ~2k tokens per diagnosis on `claude-sonnet-5`. It would change the prose and none
+> of the numbers.
+
+**Test:**
+
+```python
+def test_telemetry_reports_every_stage(store):
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    t = card.telemetry
+    assert set(t.stage_ms) == {"detect", "drill", "symptoms", "rank", "seasonal"}
+    assert t.total_ms >= sum(t.stage_ms.values()) * 0.9
+    assert t.queries == len(pipeline.card_query_ids(card))
+
+
+def test_offline_path_makes_no_model_calls(store):
+    """The claim the README rests on, asserted rather than stated."""
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    assert (card.telemetry.llm_calls, card.telemetry.llm_cost_usd) == (0, 0.0)
+```
+
+**Risk:** timings vary run to run, so assert **structure and zero**, never a duration.
+`test_pipeline.py`'s existing latency test already has a generous bound — do not tighten
+it to make telemetry look good.
 
 ---
 
 ## Task 7 — Abstention demo path
 
-**Goal:** abstention **demonstrated**, not described. The code path already exists;
-it just has no way to reach it without editing source.
+**Goal:** abstention **demonstrated**, not described. The code path exists and is
+already written well; there is simply no way to reach it without editing source.
+Cheapest item on the list.
 
-**Files:** `app.py`, `ledgerlens/pipeline.py`
+**Files:** `app.py`, `ledgerlens/pipeline.py`, `ledgerlens/hypothesis.py`
 
-Sidebar toggle: *"simulate: deploy source not connected"* → drops `source="github"`
-events from candidate generation → nothing clears `config.SCORE_FLOOR` (0.45) →
-`narrate._no_cause_card()` renders, and it **already** emits the right thing: what is
-connected vs not, plus a P1 action to *"connect {missing} so the next incident of this
-shape has candidates to test"*.
+### 7.1 — A source-drop switch
 
-Cheapest item on the list — the payoff is entirely in `_no_cause_card` already being
-written. Must join the `load()` cache key.
+`hypothesis.candidates(store, a)` iterates `store.events()`. Add an optional filter
+threaded from `diagnose()`:
 
----
+```python
+def candidates(store: Store, a: Anomaly, drop_sources: frozenset[str] = frozenset()):
+    ...
+        if ev.source in drop_sources:
+            continue
+```
 
-## Task 8 — Model id + one real LLM call
+`diagnose(..., drop_sources=frozenset())` passes it to `hypothesis.rank`.
 
-**Goal:** it is an AI challenge and the demo currently makes zero model calls.
+### 7.2 — Sidebar toggle
 
-**Files:** `config.py`, `ledgerlens/narrate.py`
+> ☐ Simulate: deploy source (github) not connected
 
-- **`config.py:100` — `MODEL = "claude-sonnet-4-6"` is not a valid model id.**
-  Use `claude-sonnet-5`. One line, and a judge who knows the API will notice.
-- Ship the narrator's LLM branch: structured output, Pydantic-validated, template
-  fallback when `ANTHROPIC_API_KEY` is unset — so **tests stay deterministic** and the
-  no-key install story in the README survives.
-- Optionally the *"causes we cannot verify"* panel: one bounded call listing plausible
-  external causes with the data source that would test each. Visually separate,
-  purely additive, and it answers "what if the real cause was never recorded?"
-- Record model choice and cost-per-diagnosis in the Task 6 telemetry panel — the brief
-  explicitly asks for that reasoning.
+On: `drop_sources={"github"}` → the SEPA deploy never becomes a candidate → nothing
+clears `config.SCORE_FLOOR` → `_no_cause_card()` renders. It **already** emits exactly
+the right thing: which sources are and are not connected, plus a P1 action to *"connect
+{missing} so the next incident of this shape has candidates to test"*.
 
----
+**Must join the `load_payload` cache key** — same reason as role and window.
 
-## Task 9 — `effect.py`: diff-in-diff + bootstrap CI
+**Test:**
 
-**Goal:** the −$410k headline currently ships with no interval and the README has to
-apologise for it. `narrate.py:226` passes `effect=None`.
+```python
+def test_dropping_the_deploy_source_forces_abstention(store):
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store,
+                                drop_sources=frozenset({"github"}))
+    assert payload.no_confident_cause is True
+    card = narrate.narrate(payload)
+    assert card.no_confident_cause is True
+    assert "not connected" in card.summary.lower()
+    assert card.actions[0].lever == "connect_source"
 
-**Files:** `ledgerlens/effect.py` (new), `ledgerlens/narrate.py`
 
-`EffectEstimate` (models.py:205), `config.BOOTSTRAP_ITERS` (2000) and `config.CI_LEVEL`
-(0.95) all exist and are unused. The spec's own sketch is ~30 lines:
+def test_abstention_is_identical_for_every_persona(store):
+    """Already asserted in test_narrate_personas.py, re-asserted on the REACHABLE
+    path: a CFO must not be handed a confident answer the analyst was refused."""
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store,
+                                drop_sources=frozenset({"github"}))
+    for pid in ("analyst", "cfo", "oncall", "growth"):
+        assert narrate.narrate(payload, persona=personas.get(pid)).no_confident_cause
+```
 
-1. fit the pre-period relationship between the focal cohort and an unaffected control
-   cohort (DACH-card, UK-sepa)
-2. project through the incident window
-3. bootstrap the residuals
-
-Headline becomes **"−$410k (95% CI ±$Xk) vs counterfactual"** — materially stronger,
-and it upgrades "materiality = statistical + business impact" from the brief.
-
-**Test:** the true injected effect from `ground_truth.json` falls inside the CI; the
-interval is not degenerate.
-
----
-
-## Task 10 — Ingest `slack.json`
-
-**Goal:** `data/slack.json` is generated by `gen_data._write_slack()` and read by
-nothing. Easy heterogeneous-sources win.
-
-**Files:** `ledgerlens/ledger/connectors.py`, `ledgerlens/store.py`
-
-A deterministic keyword/regex lane turning the ops alert into a corroborating signal,
-labelled **"unstructured source — inferred, verify"**. `ChangeEvent.extraction` already
-distinguishes `deterministic` from inferred, and `app.py` already renders that as a
-`🏷️ Inferred — verify` badge — so the UI work is zero. Closes the two-lane ingestion
-loop the README already claims.
-
----
-
-## Task 11 — `ambiguity.py`: the discriminating test
-
-**Goal:** the design doc calls this the thing "no other team will have", and it is the
-best answer to the brief's uncertainty requirement.
-
-**Files:** `ledgerlens/ambiguity.py` (new), `ledgerlens/gen_data.py`,
-`ledgerlens/pipeline.py`
-
-`config.AMBIGUITY_EPSILON` (0.08) and the `DiscriminatingTest` model (models.py:232)
-exist; `DiagnosisCard.open_question` is always `None`.
-
-Minimal version: when the top-2 scores are within ε, diff the two blast radii, find a
-slice where they predict different behaviour, run the query if the data can answer it,
-otherwise emit the cheapest next test with an owner.
-
-**Needs a generator scenario that actually produces a near-tie**, or it never appears
-on camera. That dependency on `gen_data.py` is why this is last — same fragility risk
-as Task 3.
+**Risk:** dropping `github` also removes the *other* eight deploys, so verify the
+campaign decoy does not accidentally win. It should not — its `N` is 0.0 from the
+segment-sibling control, so it is rejected outright rather than promoted. Assert that
+explicitly if the first run surprises you.
 
 ---
 
 ## Task 12 — Submission package
 
-**Files:** `.gitignore`, `README.md`, `requirements.txt`, `docs/`, `mockups/`
+**Goal:** the three things the brief literally asks you to hand in. **Not optional, and
+not a checklist row** — a missing deliverable is a different order of failure from a
+missing feature.
 
-- **`.gitignore` `*.md` fix** (§0) — do this *first*, or the proposal silently never
-  commits
-- **`requirements.txt` / lockfile** — `uv pip compile`, so the 30-second install claim
-  survives a judge's laptop
-- **README requirement-map table** — a row per brief requirement → where it lives in
-  the repo. Makes grading effortless; costs an hour
-- **Screenshots / GIF** — `../mockups/` already has six rendered screens
-  (`mock_1_dashboard_alert.png` … `mock_6_release_watch.png`) to mirror
-- **Charts** (P2, if time): `plotly` is already a dependency and `app.py` has **zero**
-  plots. Two earn their place — (1) focal metric time series with the frozen
-  Theil–Sen baseline overlaid and the anomaly window shaded, the single most
-  persuasive image this system can produce; (2) an attribution treemap above the
-  dataframe
-- **Watchtower landing** (P2, if time): the brief says "detects *and prioritises*". A
-  list of all metrics scanned as-of the date, one row per flagged anomaly, click
-  through to the diagnosis. Reframes the product from "tool you point" to "engine that
-  surfaces"
-- **Business proposal** — problem framing, target users, business case, phased roadmap
-  (§10 of the redesign doc is already this), risks + mitigations (the README's honesty
-  section is already this). Mostly assembly
-- **Regenerate the "96 tests" claim** — README lines 42 and 170. Tasks 1–7 all add
-  tests; the number must stay true
-- **Demo video** — beats: pain → watchtower alert → drill-down finds
-  DACH×Enterprise×SEPA → *linger on the decoy being rejected by the control that
-  killed it* → CFO vs on-call from the same evidence → confirm click moves the prior →
-  abstention + telemetry close: *"and when it doesn't know, it says so — for $0.00 per
-  diagnosis."*
-- **Push.** Nothing since Aug 16 is on the remote.
+> **What Round 2 Asks You to Deliver:** Detailed Business Proposal · Working Prototype ·
+> Public GitHub repository, including a prototype demo video and a README
+
+**Files:** `README.md`, `docs/business_proposal.md`, `requirements.txt`, `mockups/`
+
+### 12.1 — Requirement map in the README (do this first)
+
+A table with a row per rubric line → where it lives in the repo, with file links. Makes
+grading effortless and costs an hour. The three decisions docs are already written; this
+is the index over them.
+
+### 12.2 — `requirements.txt`
+
+```bash
+uv pip compile --python .venv/bin/python -o requirements.txt - <<'EOF'
+duckdb
+pandas
+pyarrow
+numpy
+scipy
+statsmodels
+pydantic
+streamlit<1.63
+plotly
+anthropic
+pytest
+EOF
+```
+
+So the install claim survives a judge's laptop. Verify by cold-cloning into `/tmp` and
+following only the README.
+
+### 12.3 — Business proposal (`docs/business_proposal.md`)
+
+Mostly assembly — the material exists:
+
+| Section | Source |
+|---|---|
+| Problem framing | `README.md` opening + `businessintelligence-ai-redesign.md` |
+| Solution design | the three `docs/*_decisions.md` |
+| Target users | the four personas, with channels and decision rights |
+| Business case | the −$410k incident: days of analyst time vs a sub-second diagnosis |
+| Phased roadmap | §10 of the redesign doc, plus the cut list at the foot of this file — the honest "what's next" |
+| Risks + mitigations | the README's "what this does and does not claim" section is already this |
+
+### 12.4 — Screenshots
+
+`../mockups/` has six rendered screens (`mock_1_dashboard_alert.png` …
+`mock_6_release_watch.png`). Mirror the live UI against them and embed 3–4 in the README.
+
+### 12.5 — Demo video
+
+Beats, in order:
+
+1. **The pain** — dashboards say *what*, not *why*; days of analyst time.
+2. **The anomaly** — `mrr_renewals` down 8.3%, and the card separates 1.2% seasonality
+   from the 7.0% that is real.
+3. **The drill-down** — narrowed to `DACH · Enterprise · sepa`, 3 of 99 slices.
+4. **Linger on the decoy.** The marketing cut is temporally *more* plausible and dies
+   anyway, by a control that predicted DACH Mid/SMB should also drop — they came in
+   flat at −1.3%. Show the control table. **This is the single most persuasive 20
+   seconds in the product.**
+5. **Same evidence, four audiences** — flip the persona selector. CFO gets dollars and
+   an escalation; on-call gets the sha and a rollback. Say the query ids are identical.
+6. **The rate KPI that refuses** — insufficient history, declines to detect, asks for a
+   window, then explains it anyway.
+7. **Entitlement** (Task 4) — growth loses the rail cut, and the card names the policy.
+8. **Close on telemetry** (Task 6) — *"and when it doesn't know, it says so — for
+   $0.0000 per diagnosis, with every number traceable to a logged query."*
+
+**P2, only if the video is already recorded:** two `plotly` charts (`plotly` is already
+a dependency and `app.py` has zero plots) — the focal series with the frozen Theil–Sen
+baseline overlaid and the anomaly window shaded, and an attribution treemap. The first
+is the most persuasive single image this system can produce. And the watchtower landing
+page, which reframes the product from "tool you point" to "engine that surfaces".
+
+**Risk:** this task is four hours of assembly with no technical difficulty, which makes
+it the easiest to underestimate and the most expensive to run out of time on. Start it
+before the last feature, not after.
+
+---
+
+## Task 5 — Learning-loop UI *(conditional: only if Task 12 is finished)*
+
+**Goal:** Round 2 **Objective 7** — *"Mechanism to learn from analyst and business-user
+feedback."* An objective, not an MPE row, which is why it sits below the cut line.
+
+**Files:** `app.py`, `tests/`
+
+`learning.record()` and `learning.prior()` both exist and are wired to the `verdict`
+table; nothing calls `record`. `prior()` counts rows at read time, so the **P**
+component moves with no other plumbing: Beta(1,1) = 0.50 → one confirm → Beta(2,1) =
+**0.67**.
+
+- Confirm / Reject / Correct buttons on each hypothesis in `render_hypothesis()`
+- on click: `learning.record(store, ...)` → `st.cache_resource.clear()` → `st.rerun()`
+- show before/after next to the P bar — a 15-second video beat
+
+**Risk — decide this before recording.** `verdict` rows persist in
+`data/ledgerlens.duckdb`. Repeated demo clicks drift the priors away from the numbers in
+the README and in `tests/test_app.py` (`scores[0] == "0.700"`). Ship a **"reset
+feedback"** button in the sidebar, or delete the db before recording. A demo that
+contradicts the README is worse than no demo of this feature.
+
+---
+
+## Cut, and why
+
+Dropped deliberately, not forgotten. Each one is named in the business proposal's
+roadmap as next-phase work — a gap we can point at beats a gap a judge finds.
+
+| Task | Est. | Why it is safe to drop |
+|---|---|---|
+| **8 — LLM narrator** | 3h | Row 9 asks us to *explain* the LLM/non-LLM split, not to make calls. **"0 LLM calls, $0.0000 per diagnosis, every number from a logged query"** is a stronger answer than one API call, and Task 6 puts it on screen. The one-line model-id fix is kept in Task 0. |
+| **9 — effect CI** | 3h | Materiality-as-statistics is a *Complexity*, not an MPE row. The README already states plainly that the −$410k figure has no interval behind it. A documented honest gap reads better than a rushed bootstrap nobody had time to validate. |
+| **10 — Slack ingest** | 2h | "Heterogeneous sources" is already covered by three KPIs across three systems plus four ledger connectors. Genuinely redundant. `data/slack.json` stays generated and unread — note it in the roadmap. |
+| **11 — ambiguity** | 3h | Highest risk on the board: needs a `gen_data.py` change to manufacture a near-tie, and would break `test_hypothesis.py:89`, which asserts the top-two gap *exceeds* `AMBIGUITY_EPSILON`. Maps to no MPE row. `DiagnosisCard.open_question` stays `None`. |
+
+**~11 hours freed.** Kept work is ~8h plus the conditional.
 
 ---
 
 ## Cross-cutting notes
 
-**The `load()` cache key.** `app.py`'s `@st.cache_resource` keys on
-`(metric, as_of_iso)`. Tasks 2, 4, 5 and 7 all add inputs that change the rendered
-card. Every one must join that key, or the demo shows a stale card at the worst
-possible moment. Consider fixing the signature once, now, rather than four times.
+**The `load_payload` cache key.** Half-paid. Task 2 moved the boundary *below*
+narration, so persona needs no key. Tasks 4 (role), 5 (feedback) and 7 (dropped
+sources) all change the **payload** and therefore all **must** join the key — Task 3
+already added cohort and window. Fix the signature once, in Task 4, rather than three
+times. The docstring on `load_payload` carries this warning.
 
-**`gen_data.py` is the fragile one.** Tasks 3 and 11 both touch it. It is seeded and
-`test_pipeline.py` asserts the exact injected incident and the exact rejected decoy.
-Regenerate and run the full suite after *any* change there, and never let a new metric
-perturb the two existing series.
+**`gen_data.py` is the fragile one.** Nothing in this cut list touches it — that is one
+of the reasons Task 11 was dropped. If something changes anyway: it uses one sequential
+RNG stream, so any new series needs its own `default_rng(SEED_*)`, and
+`tests/test_sparse_kpi.py`'s fingerprints must stay green. **If a fingerprint fails, fix
+the generator, never the hash.**
 
-**Test count is a claim.** The README states 96 in two places. It is currently true.
-Keep it true.
+**Test count is a claim.** 182 today. Tasks 4, 6 and 7 all add tests. Task 0's
+`test_readme_test_count_is_true` makes drift a test failure instead of a credibility
+leak — keep it passing rather than deleting it when it goes red.
+
+**Every number still needs a `query_id`.** `Store.q` remains the only path to the
+database. Telemetry (Task 6) is the one legitimate exception: latency is a fact about
+the process, not about the data, and it carries no `query_id` because there is no query
+behind it. Say so in the panel rather than leaving a judge to wonder.
