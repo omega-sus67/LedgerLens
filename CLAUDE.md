@@ -17,13 +17,17 @@ deliberately; don't let this file duplicate or drift from it.
 
 ## Current state (as of 2026-08-29)
 
-- Deterministic core is done and stable: **200 tests passing**, decoy-rejection demo
+- Deterministic core is done and stable: **218 tests passing**, decoy-rejection demo
   works end-to-end, README's claims verified against the code.
-- **Tasks 1, 2, 3 and 4 are done** (KPI semantic contract; personas + `Action` reshape;
-  third KPI with sparse history; role-based entitlement). Rationale for each lives in
-  `docs/contracts_decisions.md`, `docs/persona_decisions.md`,
-  `docs/sparse_kpi_decisions.md` and `docs/roles_decisions.md`. 1-3 are merged to
-  `main`; 4 is on `task-4-entitlement`.
+- **Tasks 1, 2, 3, 4 and 6 are done** (KPI semantic contract; personas + `Action`
+  reshape; third KPI with sparse history; role-based entitlement; telemetry panel).
+  Rationale for each lives in `docs/contracts_decisions.md`,
+  `docs/persona_decisions.md`, `docs/sparse_kpi_decisions.md`,
+  `docs/roles_decisions.md` and `docs/telemetry_decisions.md`. 1-3 are merged to
+  `main`; 4 is on `task-4-entitlement`, 6 is stacked on it as `task-6-telemetry`.
+- **ALL TEN Minimum Prototype Expectation rows now close.** Task 6 closed the last two
+  (row 9, LLM vs non-LLM breakdown; row 10, runtime telemetry). Task 7 hardens row 5
+  but does not close a new one.
 - Confirmed via a genuine cold clone (`git clone` into `/tmp`, fresh venv, README's
   documented install steps only) that `gen_data.py` -> `pytest` -> `pipeline.py`
   reproduce the full diagnosis card with zero data files at checkout. `data/*` is
@@ -124,12 +128,43 @@ before touching `AccessRule`, `pipeline._visible_dims`, or the cache key.
   `tests/test_narrate_personas.py` still passes -- it renders one role-free payload four
   ways, which is still the meaningful invariant.
 
+## Done: task 6 -- the telemetry panel
+
+Closes MPE rows 9 and 10, which takes the checklist to ten of ten.
+**Full rationale in [docs/telemetry_decisions.md](docs/telemetry_decisions.md).**
+
+- **"Queries" is THREE numbers, and merging them understates the work ~6x.**
+  `queries_executed` (86 cold) is what the diagnosis cost; `queries_on_card` (19) is
+  what a reader can audit; `queries_cached` (39) is work avoided. **Never add a field
+  called `queries`.** Metadata lookups (`dim_universe`, `events`) are counted in none of
+  them -- no user-facing number, so no `query_id`.
+- **The counter lives on `Store`**, because only `q()` knows what was a cache hit.
+  `stats_snapshot()` returns a COPY; `diagnose()` subtracts before from after, so a
+  long-lived Store reports per-diagnosis rather than since-boot.
+- **`stage_ms` keys reflect the path taken** -- the manual-window branch reports
+  `{measure, symptoms, rank, seasonal}`, not five keys padded with 0.0. A padded zero
+  reads as "instant"; an absent key reads as "not applicable".
+- **Never assert a duration.** Cold vs warm is 2.6x and the session-scoped `store`
+  fixture's warmth is test-ORDER dependent. Assert structure and zero.
+  `test_runs_within_the_latency_budget`'s 5.0s bound stays as it is -- do not tighten it
+  to flatter telemetry.
+- **`total_ms` includes narration** because the panel lists narration as a stage.
+  Otherwise the share column sums past 100%, which is the kind of small error that makes
+  a reader distrust every other number.
+- **`_Stopwatch.time` uses try/FINALLY.** The timing is recorded even when a stage
+  raises, and the exception still propagates. Do not convert it to `except`.
+
 ## Conventions this repo uses (learned, not to be reinvented)
 
 - **Every number traces to a query.** `Store.q()` is the only path to the
   database; it hashes SQL+params into a `query_id` and logs it. Any new feature
   that surfaces a number to the UI should route through it — that's the
   anti-hallucination mechanism the whole pitch rests on.
+- **There are exactly TWO deliberate exceptions to that rule**, and both are facts
+  about the PROCESS rather than the data: the telemetry panel (latency) and the
+  redaction notice (policy). Both say so on screen rather than leaving a gap to be
+  noticed. **A third exception should have to make the argument again** -- two is a
+  considered boundary, three is a habit.
 - **`config.py` holds only global defaults now that `contracts.py` exists.**
   Per-KPI alerting behavior belongs in a `KpiContract`; genuinely global pipeline
   parameters (e.g. `CONTRIBUTION_FLOOR`, `MAX_DRILL_DEPTH`) stay in `config.py`.
@@ -167,9 +202,8 @@ before touching `AccessRule`, `pipeline._visible_dims`, or the cache key.
 ## Deadline context
 
 Submission: **2026-08-30**. The schedule is `taskflow/taskflow.md`'s task order. Tasks
-1-4 are done (4 on `task-4-entitlement`, unmerged); 6 and 7 are the remaining checklist
-rows and are non-negotiable, since a missing checklist row is a zero rather than a
-deduction. Task 12
+1-4 and 6 are done (4 and 6 unmerged, stacked). **All ten checklist rows close.** Task 7
+(reachable abstention) hardens row 5 and is cheap; task 12
 (submission package) is a *deliverable*, not a feature -- never cut it. Cut line if
 behind: drop task 5 (learning loop), then the P2 items inside 12. Tasks 8-11 are already
 cut.

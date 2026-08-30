@@ -261,6 +261,52 @@ not a login. Full reasoning and the named gaps in
 
 ---
 
+## LLM versus non-LLM, and what a diagnosis costs
+
+**Nothing on the ranking path calls a model.** Detection, attribution, candidate
+generation, scoring, negative controls and narration are deterministic Python and SQL.
+That is a design decision, not an omission — and the check is that the entire test suite
+and the whole demo run with `ANTHROPIC_API_KEY` unset.
+
+The ⏱ **Telemetry** panel puts the accounting on the page:
+
+| stage | ms | share |
+|---|---:|---:|
+| **drill** | 757.5 | **62%** |
+| rank | 363.9 | 30% |
+| detect | 70.9 | 6% |
+| seasonal | 15.2 | 1% |
+| symptoms | 14.5 | 1% |
+| narrate | 0.4 | 0% |
+| **total** | **1,222 ms** | |
+
+| | count |
+|---|---:|
+| registered queries executed | **86** |
+| …served from cache | 39 |
+| **distinct `query_id`s replayable on the card** | **19** |
+| **LLM calls / tokens / cost** | **0 / 0 / $0.0000** |
+
+Two of those numbers deserve their distinction. **86** is what the diagnosis cost to
+produce; **19** is how much of it a reader can audit. Reporting the smaller one as
+"queries" would understate the work by roughly 6×, in the one panel whose whole job is
+honest cost accounting — so both are shown, under names that cannot be confused.
+Metadata lookups (`dim_universe`, `events`) are counted in neither: they carry no
+user-facing number and therefore no `query_id`.
+
+**The zero, priced.** With the optional LLM narrator enabled, narration alone would add
+about one call per diagnosis on `claude-sonnet-5` — roughly 3.5k input and 600 output
+tokens, about **$0.013** at $2.00 / $10.00 per MTok. It would change the prose and none
+of the numbers, because narration reads every figure off the payload and computes
+nothing.
+
+Telemetry is one of exactly **two** numbers on the page that carry no `query_id` — the
+other is the redaction notice. Both are facts about the *process* rather than the data,
+and the UI says so rather than leaving a gap to be noticed. Full reasoning in
+[`docs/telemetry_decisions.md`](docs/telemetry_decisions.md).
+
+---
+
 ## What the demo shows
 
 The synthetic data has known ground truth, so the ranking can be *proven* right rather than merely look plausible.

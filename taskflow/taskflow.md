@@ -74,10 +74,10 @@ single one of them is fatal. The cut below follows that distinction.
 | 6 | One sparse-history or newly launched KPI scenario | ✅ Task 3 |
 | 7 | One role-based security or entitlement scenario | ✅ Task 4 — `fin.rail_detail` redacts the rail cut from `growth`, and the card names the policy |
 | 8 | Evidence showing source freshness, analytical method, contribution, confidence and lineage | ✅ Tasks 1 + 2 |
-| 9 | A clear breakdown of LLM versus non-LLM processing | ⚠️ README only — **Task 6** puts it where judges look |
-| 10 | Runtime telemetry covering latency, model calls, token usage and estimated cost | ❌ **Task 6** |
+| 9 | A clear breakdown of LLM versus non-LLM processing | ✅ Task 6 — the ⏱ panel, on the page |
+| 10 | Runtime telemetry covering latency, model calls, token usage and estimated cost | ✅ Task 6 |
 
-**Eight of ten close.** Task 6 closes the remaining two rows.
+**TEN OF TEN CLOSE.** Task 7 hardens row 5; task 12 is the submission package.
 
 ---
 
@@ -87,7 +87,7 @@ single one of them is fatal. The cut below follows that distinction.
 |---|---|---|---|
 | ~~0~~ | ~~Merge, correct the claims, push~~ ✅ | the *repository* deliverable | done |
 | ~~4~~ | ~~Role-based entitlement~~ ✅ | MPE row 7 | done |
-| 6 | Telemetry panel | MPE rows 9 **and** 10 | 1.5h |
+| ~~6~~ | ~~Telemetry panel~~ ✅ | MPE rows 9 **and** 10 | done |
 | 7 | Abstention demo path | hardens MPE row 5 | 1h |
 | 12 | Submission package | proposal · video · README · repo | 4h |
 | 5 | Learning-loop UI *(conditional)* | Objective 7 — **only if 12 is done** | 2h |
@@ -274,7 +274,15 @@ redaction line is what makes it read as policy rather than breakage. Do not skip
 
 ---
 
-## Task 6 — Telemetry panel
+## Task 6 — Telemetry panel ✅ **DONE**
+
+> **Landed 2026-08-30** on `task-6-telemetry`. Decisions:
+> [`docs/telemetry_decisions.md`](../docs/telemetry_decisions.md). Plan as executed:
+> [`telemetry_tasks.md`](telemetry_tasks.md). Three errors in the sketch below were
+> corrected during implementation — `queries` is three different numbers and the draft
+> picked the one that understates the work ~6x; the five-stage assertion breaks on the
+> manual-window path; and timings are cache-dependent enough that no duration may be
+> asserted. Corrected reasoning in the decisions doc; the sketch is kept for history.
 
 **Goal:** the runtime-constraints row, and it doubles as the LLM-vs-non-LLM breakdown
 **in the UI**, where judges look — today that claim lives only in the README. Closes
@@ -560,7 +568,7 @@ RNG stream, so any new series needs its own `default_rng(SEED_*)`, and
 `tests/test_sparse_kpi.py`'s fingerprints must stay green. **If a fingerprint fails, fix
 the generator, never the hash.**
 
-**Test count is a claim.** 200 today. `tests/test_docs.py` fires on EVERY task that
+**Test count is a claim.** 218 today. `tests/test_docs.py` fires on EVERY task that
 adds tests, so update `README.md`'s number in the same commit -- otherwise every
 intermediate commit on a branch is red. Tasks 4, 6 and 7 all add tests. Task 0's
 `test_readme_test_count_is_true` makes drift a test failure instead of a credibility
