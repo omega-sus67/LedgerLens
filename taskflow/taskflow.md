@@ -89,8 +89,20 @@ single one of them is fatal. The cut below follows that distinction.
 | ~~4~~ | ~~Role-based entitlement~~ ✅ | MPE row 7 | done |
 | ~~6~~ | ~~Telemetry panel~~ ✅ | MPE rows 9 **and** 10 | done |
 | ~~7~~ | ~~Abstention demo path~~ ✅ | hardens MPE row 5 | done |
+| ~~8~~ | ~~Investigator lane (the AI)~~ ✅ | the AI story the challenge is named for | done |
 | 12 | Submission package | proposal · video · README · repo | 4h |
 | 5 | Learning-loop UI *(conditional)* | Objective 7 — **only if 12 is done** | 2h |
+
+**Task 8 was un-cut on Aug 30 and built.** The reason it came back: this is an *AI*
+innovation challenge and the prototype made **zero LLM calls**, so the telemetry panel
+reported `0 calls / $0.0000` as its entire AI story. The lane was already specified in
+`businessintelligence-ai-redesign.md` sec 4.9 and every model it needed
+(`ProposedTest`, `UnverifiedHypothesis`, `Telemetry.llm_*`, `generated_by`) was already
+declared and never populated -- so it was a wiring job, not a design job. It also made
+the system **provider-agnostic** (Gemini Flash by default, Anthropic by env var).
+Rationale: [`docs/ai_decisions.md`](../docs/ai_decisions.md). Site 1 of the four spec'd
+call sites (the LLM event normalizer) stays cut, because it is the only one that is not
+additive -- see D2.
 
 **Cut line if behind:** drop 5, then the P2 items inside 12 (charts, watchtower
 landing). **Never drop 0 or 12** — those are deliverables, not features, and a missing

@@ -15,9 +15,9 @@ Read [README.md](README.md) first for what the system actually does and the hone
 scope of its claims — it is the canonical description and is kept accurate
 deliberately; don't let this file duplicate or drift from it.
 
-## Current state (as of 2026-08-29)
+## Current state (as of 2026-08-30)
 
-- Deterministic core is done and stable: **229 tests passing**, decoy-rejection demo
+- Deterministic core is done and stable: **293 tests passing**, decoy-rejection demo
   works end-to-end, README's claims verified against the code.
 - **Tasks 1, 2, 3, 4, 6 and 7 are done** (KPI semantic contract; personas + `Action`
   reshape; third KPI with sparse history; role-based entitlement; telemetry panel;
@@ -39,13 +39,16 @@ deliberately; don't let this file duplicate or drift from it.
 - **`taskflow/taskflow.md` is the live plan**, rewritten 2026-08-29 and cut to
   essentials. The original twelve tasks were not achievable in the time left; what
   remains is 4 (role-based entitlement), 6 (telemetry panel), 7 (abstention demo path)
-  and 12 (submission package), plus conditional 5. Tasks 8-11 are cut deliberately and
-  are named in the file with the reason. Seven of the ten Minimum Prototype
+  and 12 (submission package), plus conditional 5. Tasks 9-11 remain cut deliberately
+  and are named in the file with the reason. **Task 8 was un-cut and built**: the
+  challenge is an AI challenge and the repo had no LLM in it. Seven of the ten Minimum Prototype
   Expectations already close; tasks 4 and 6 close the remaining three rows.
 - **Everything through task 3 is pushed to `origin/main`.** The stacked branches
   `task-2-personas` and `task-3-sparse-kpi` were fast-forwarded into `main`.
 - **`tests/test_docs.py` guards the README's own claims.** The test count in
-  `README.md` and the `MODEL` id in `config.py` are now assertions, not prose. If it
+  `README.md`, the completeness of every `config.PROVIDERS` row, and the README's
+  naming of the default model and its API-key env var are assertions, not prose.
+  It no longer pins a vendor string -- task 8 replaced that with seam checks. If it
   goes red, update the document -- do not delete the test. **It fires on every task that
   adds tests**, so update `README.md`'s count in the SAME commit rather than at the end
   of a branch, or every intermediate commit is red.
@@ -181,6 +184,53 @@ A sidebar switch now simulates the deploy connector never having been wired up.
 - **A system that shows less must say why.** Same principle as task 4's redaction
   banner: the toggle is labelled, captioned while active, and the card names the feed it
   is missing.
+
+## Done: task 8 -- the investigator lane (the AI)
+
+The repo had **zero LLM calls** on an AI challenge. Not an oversight in the design --
+`businessintelligence-ai-redesign.md` sec 4.9 specifies the lane and nothing built it,
+leaving `config.MODEL`, `LLM_TEST_BUDGET`, `Telemetry.llm_*`, `generated_by`,
+`ProposedTest` and `UnverifiedHypothesis` as sockets with nothing plugged in.
+**Full rationale in [docs/ai_decisions.md](docs/ai_decisions.md)** -- read it before
+touching `llm.py`, `investigator.py`, `config.PROVIDERS` or the `investigate` flag.
+
+- **THE invariant: the LLM cannot change a rank.** Enforced in three places, not by
+  convention: proposed checks are built with `decisive=False` (the field
+  `controls.score_n` reads), they are never passed to `score_n`, and the lane runs
+  AFTER `hypothesis.rank`. `test_the_lane_cannot_change_a_single_score` asserts scores,
+  not order -- order is the weaker claim.
+- **Provider-agnostic, Gemini Flash by default.** `config.PROVIDERS` is the ONLY place
+  a vendor is named; `llm.py` has one adapter per row. `LEDGERLENS_LLM_PROVIDER=anthropic`
+  switches vendor with no source change. **The `Provider` protocol has exactly one
+  method** and there is a test that keeps it that way -- a second method would describe
+  one vendor's feature and the investigator would start branching on vendor.
+- **Wire schemas are hand-written, NOT `model_json_schema()`.** Pydantic emits
+  `$defs`/`$ref`, which Gemini's `responseSchema` rejects outright. Two tests guard it.
+- **Gemini transport is raw REST over httpx**, deliberately: no new dependency, and an
+  SDK abstraction leaks its vendor's concepts into the seam. `httpx` is now a DIRECT
+  dependency and is in the README install line.
+- **The numbers guard is strict on purpose.** Any numeric token in LLM prose that is
+  not in the corpus discards the whole narration for the template version. No tolerance
+  window -- a tolerance window is a range inside which a wrong number is permitted.
+  Rejections are shown on the page as the guard working.
+- **Validation rejections are COUNTED and displayed** ("4 accepted, 2 rejected"). A
+  validator that never reports catching anything is indistinguishable from one that is
+  not running.
+- **Real bug found and fixed: narration must not bill against the cached payload.**
+  `load_payload` is `@st.cache_resource`; recording narration into `payload.llm_budget`
+  made every re-render increment the same object, so the cost climbed as the reader
+  clicked. `narrate()` uses a fresh budget and `Budget.plus` sums immutably. See D11.
+- **Site 1 (the LLM event normalizer) is CUT, not merely unbuilt.** It is the only one
+  of the four spec'd sites that is not additive -- it multiplies a score by an
+  LLM-emitted confidence, which puts a model on the ranking path. Reasoning in D2;
+  the README's "Not built" section says so too.
+- **`tests/test_docs.py` no longer pins a vendor string.** Pinning `claude-sonnet-5`
+  would re-hardcode the coupling `PROVIDERS` exists to remove, so the guard moved to
+  the seam: every provider row must be complete, every row must have a transport, and
+  the README must name the default model and its env var.
+- Test count **229 -> 293**. `test_investigator.py` (36) and `test_llm.py` (19) are new;
+  8 added to `test_app.py`, including a check that the AI toggle does not displace the
+  source-drop checkbox that two other tests address BY INDEX.
 
 ## Conventions this repo uses (learned, not to be reinvented)
 
