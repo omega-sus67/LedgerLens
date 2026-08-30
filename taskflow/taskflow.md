@@ -72,12 +72,12 @@ single one of them is fatal. The cut below follows that distinction.
 | 4 | One multi-factor KPI movement with known or simulated underlying drivers | ✅ seasonality + deploy + campaign decoy, decomposed on the card |
 | 5 | One low-confidence scenario in which the engine requests clarification or abstains | ✅ Task 3 declines detection and asks for a window · **hardened by Task 7** |
 | 6 | One sparse-history or newly launched KPI scenario | ✅ Task 3 |
-| 7 | One role-based security or entitlement scenario | ❌ **Task 4** |
+| 7 | One role-based security or entitlement scenario | ✅ Task 4 — `fin.rail_detail` redacts the rail cut from `growth`, and the card names the policy |
 | 8 | Evidence showing source freshness, analytical method, contribution, confidence and lineage | ✅ Tasks 1 + 2 |
 | 9 | A clear breakdown of LLM versus non-LLM processing | ⚠️ README only — **Task 6** puts it where judges look |
 | 10 | Runtime telemetry covering latency, model calls, token usage and estimated cost | ❌ **Task 6** |
 
-**Seven of ten already close.** Two tasks close the remaining three rows.
+**Eight of ten close.** Task 6 closes the remaining two rows.
 
 ---
 
@@ -86,7 +86,7 @@ single one of them is fatal. The cut below follows that distinction.
 | # | Task | Closes | Est. |
 |---|---|---|---|
 | ~~0~~ | ~~Merge, correct the claims, push~~ ✅ | the *repository* deliverable | done |
-| 4 | Role-based entitlement | MPE row 7 | 1.5h |
+| ~~4~~ | ~~Role-based entitlement~~ ✅ | MPE row 7 | done |
 | 6 | Telemetry panel | MPE rows 9 **and** 10 | 1.5h |
 | 7 | Abstention demo path | hardens MPE row 5 | 1h |
 | 12 | Submission package | proposal · video · README · repo | 4h |
@@ -165,7 +165,14 @@ work. It is Task 0 for that reason.
 
 ---
 
-## Task 4 — Role-based entitlement
+## Task 4 — Role-based entitlement ✅ **DONE**
+
+> **Landed 2026-08-30** on `task-4-entitlement`. Decisions:
+> [`docs/roles_decisions.md`](../docs/roles_decisions.md). Plan as executed:
+> [`roles_tasks.md`](roles_tasks.md). Three errors in the sketch below were corrected
+> during implementation — the scores are *not* identical across roles, the engine must
+> use the *lenient* contract lookup, and `run()` had no `persona` parameter. The
+> corrected reasoning is in the decisions doc; the sketch is kept for history.
 
 **Goal:** redaction *with provenance* — the auditability story the rest of the system
 already tells. Closes MPE row 7, the only uncovered row.
@@ -539,7 +546,9 @@ roadmap as next-phase work — a gap we can point at beats a gap a judge finds.
 
 ## Cross-cutting notes
 
-**The `load_payload` cache key.** Half-paid. Task 2 moved the boundary *below*
+**The `load_payload` cache key.** **PAID in task 4** -- the key is now
+`(metric, as_of_iso, cohort_key, window_key, role_key)` and task 7's `drop_sources`
+slots into the same signature. Historical note follows. Half-paid. Task 2 moved the boundary *below*
 narration, so persona needs no key. Tasks 4 (role), 5 (feedback) and 7 (dropped
 sources) all change the **payload** and therefore all **must** join the key — Task 3
 already added cohort and window. Fix the signature once, in Task 4, rather than three
@@ -551,7 +560,9 @@ RNG stream, so any new series needs its own `default_rng(SEED_*)`, and
 `tests/test_sparse_kpi.py`'s fingerprints must stay green. **If a fingerprint fails, fix
 the generator, never the hash.**
 
-**Test count is a claim.** 184 today (182 + the two in `tests/test_docs.py`). Tasks 4, 6 and 7 all add tests. Task 0's
+**Test count is a claim.** 200 today. `tests/test_docs.py` fires on EVERY task that
+adds tests, so update `README.md`'s number in the same commit -- otherwise every
+intermediate commit on a branch is red. Tasks 4, 6 and 7 all add tests. Task 0's
 `test_readme_test_count_is_true` makes drift a test failure instead of a credibility
 leak — keep it passing rather than deleting it when it goes red.
 

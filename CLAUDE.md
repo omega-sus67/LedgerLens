@@ -17,12 +17,13 @@ deliberately; don't let this file duplicate or drift from it.
 
 ## Current state (as of 2026-08-29)
 
-- Deterministic core is done and stable: **184 tests passing**, decoy-rejection demo
+- Deterministic core is done and stable: **200 tests passing**, decoy-rejection demo
   works end-to-end, README's claims verified against the code.
-- **Tasks 1, 2 and 3 are done and merged to `main`** (KPI semantic contract; personas +
-  `Action` reshape; third KPI with sparse history). Rationale for each lives in
-  `docs/contracts_decisions.md`, `docs/persona_decisions.md` and
-  `docs/sparse_kpi_decisions.md`.
+- **Tasks 1, 2, 3 and 4 are done** (KPI semantic contract; personas + `Action` reshape;
+  third KPI with sparse history; role-based entitlement). Rationale for each lives in
+  `docs/contracts_decisions.md`, `docs/persona_decisions.md`,
+  `docs/sparse_kpi_decisions.md` and `docs/roles_decisions.md`. 1-3 are merged to
+  `main`; 4 is on `task-4-entitlement`.
 - Confirmed via a genuine cold clone (`git clone` into `/tmp`, fresh venv, README's
   documented install steps only) that `gen_data.py` -> `pytest` -> `pipeline.py`
   reproduce the full diagnosis card with zero data files at checkout. `data/*` is
@@ -38,7 +39,9 @@ deliberately; don't let this file duplicate or drift from it.
   `task-2-personas` and `task-3-sparse-kpi` were fast-forwarded into `main`.
 - **`tests/test_docs.py` guards the README's own claims.** The test count in
   `README.md` and the `MODEL` id in `config.py` are now assertions, not prose. If it
-  goes red, update the document -- do not delete the test.
+  goes red, update the document -- do not delete the test. **It fires on every task that
+  adds tests**, so update `README.md`'s count in the SAME commit rather than at the end
+  of a branch, or every intermediate commit is red.
 
 ## Done: task 1 -- the KPI semantic contract
 
@@ -82,11 +85,44 @@ this section is only the state summary.
 `models.py` and `pipeline.py` are untouched and `test_pipeline.py`'s acceptance test is
 not at risk. Provenance is preserved by the `query_id` on each `SourceFreshness`.
 
-**Cache-key debt, still unpaid.** Task 2 moved the narration boundary so persona needs
-no key, but tasks 4 (role), 5 (feedback) and 7 (dropped sources) each change the
-*payload*. Fix `app.py`'s `@st.cache_resource` key ONCE, in task 4 -- it currently keys on `(metric, as_of_iso)` only, and
-tasks 2, 4, 5 and 7 each add an input that changes the rendered card. Task 1 needed no
-cache work (the expander renders outside `load()`), so this is still unpaid.
+**Cache-key debt: PAID in task 4.** `load_payload` now keys on
+`(metric, as_of_iso, cohort_key, window_key, role_key)`. Persona stays OUT of the key on
+purpose -- it lives below the payload boundary and changes only prose. **Task 7's
+`drop_sources` and task 5's feedback are the same shape and belong in this signature**,
+not in a separate patch; the docstring on `load_payload` says so.
+
+## Done: task 4 -- role-based entitlement
+
+Closes the last uncovered Minimum Prototype Expectation row (7, role-based security).
+**Full rationale in [docs/roles_decisions.md](docs/roles_decisions.md)** -- read it
+before touching `AccessRule`, `pipeline._visible_dims`, or the cache key.
+
+- **Enforced in exactly one place:** the `dims` list handed to `anomaly.drill()`.
+  `hypothesis`, `controls` and `narrate` stay unaware roles exist.
+- **`role` enters ABOVE the payload boundary; persona stays below it.** Role changes
+  which cuts are drilled, so it changes the focal cohort and therefore the numbers.
+  Persona never changes a number. Do not conflate them -- that distinction is the whole
+  reason `diagnose()` and `narrate()` are separate functions.
+- **The growth card genuinely differs:** focal `DACH - Enterprise - A` at -$207,545,
+  against the analyst's `DACH - Enterprise - sepa` at -$416,144. That is correct, and the
+  banner naming policy `fin.rail_detail` is what makes it read as governance rather than
+  breakage. **Never ship the dim-hiding without the banner.**
+- **Ranked ORDER is identical across roles; scores are NOT** (0.700 vs 0.627), because
+  `hypothesis.rank` scores against the focal cohort and the focal moved. Assert order,
+  never scores -- `test_redaction_does_not_reorder_the_candidates` has the reasoning.
+- **A redaction is not an `EvidenceStep`** -- that model requires a `query_id` and there
+  is no query behind a policy decision. `Redaction` is its own model.
+- **The banner does not count hidden slices.** Computing that count means running the
+  unrestricted drill, i.e. producing the answer the reader is not entitled to.
+- **The engine uses the LENIENT contract lookup** (`contracts.CONTRACTS.get`), matching
+  `contracts.thresholds()`. `contracts.get` raises and belongs to the UI only.
+- **Known gap, documented not fixed:** manual cohort selection bypasses the drill
+  chokepoint and is not entitlement-checked. Unreachable today (only sparse-history KPIs
+  use that path, and none declare an `AccessRule`). See `roles_decisions.md` D7.
+- **Demo consequence:** "same evidence, four audiences, identical query ids" is now false
+  for `growth` and must be re-scripted. It holds for analyst/cfo/oncall.
+  `tests/test_narrate_personas.py` still passes -- it renders one role-free payload four
+  ways, which is still the meaningful invariant.
 
 ## Conventions this repo uses (learned, not to be reinvented)
 
@@ -131,8 +167,9 @@ cache work (the expander renders outside `load()`), so this is still unpaid.
 ## Deadline context
 
 Submission: **2026-08-30**. The schedule is `taskflow/taskflow.md`'s task order. Tasks
-1-3 are done and merged; 4, 6 and 7 are the remaining checklist rows and are
-non-negotiable, since a missing checklist row is a zero rather than a deduction. Task 12
+1-4 are done (4 on `task-4-entitlement`, unmerged); 6 and 7 are the remaining checklist
+rows and are non-negotiable, since a missing checklist row is a zero rather than a
+deduction. Task 12
 (submission package) is a *deliverable*, not a feature -- never cut it. Cut line if
 behind: drop task 5 (learning loop), then the P2 items inside 12. Tasks 8-11 are already
 cut.

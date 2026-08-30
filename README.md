@@ -203,8 +203,61 @@ on the page.
 asserts four distinct summaries against one identical 19-element `query_id` list. Full
 reasoning in [`docs/persona_decisions.md`](docs/persona_decisions.md).
 
+**Stated precisely: identical evidence *at a fixed entitlement*.** Persona changes prose
+and never a number. **Role** is a different axis and does change numbers — see the next
+section. Analyst, CFO and on-call share a role's worth of access and therefore share
+every `query_id`; Growth is entitled to less, and their card says so.
+
 Abstention is the one thing that never varies by audience: a CFO is never handed a
 confident answer the analyst was refused.
+
+---
+
+## Role-based entitlement: redaction that names itself
+
+A KPI contract declares who may see which *cuts* of it. `mrr_renewals` carries one rule:
+
+```python
+AccessRule(
+    policy_id="fin.rail_detail",
+    role="growth",
+    hidden_dims=["payment_rail"],
+    reason="Payment-rail revenue splits are finance-restricted; growth sees "
+           "region and segment cuts only.",
+)
+```
+
+Selecting the **Growth Marketing** persona removes `payment_rail` from the dimensions
+handed to the drill-down. The consequence is real and visible:
+
+| | Revenue Analyst | Growth Marketing |
+|---|---|---|
+| focal cohort | `DACH · Enterprise · sepa` | `DACH · Enterprise · A` |
+| headline | **−85.2%, −$416,144** | **−34.6%, −$207,545** |
+| top candidate | `deploy_sepa_v214` @ 0.700 | `deploy_sepa_v214` @ 0.627 |
+| ranked order | — | **identical** |
+| decoy rejected | `campaign_dach_cut` | `campaign_dach_cut` |
+
+**Growth's number is smaller because their cut is shallower, not because the engine
+failed** — and the card says exactly that, naming the policy and quoting its declared
+reason. `policy_id` and `reason` are read off the contract, never retyped into the
+narrator, so changing the contract changes the card; a test asserts it.
+
+Two properties worth stating, both tested:
+
+- **Entitlement hides cuts, not candidates.** The ranked set and its order are identical
+  across roles. Scores *do* move (0.700 → 0.627) because the focal cohort legitimately
+  changed — a policy that silently promoted a different cause would be a security hole
+  dressed as a feature, so the ordering is asserted.
+- **A redaction notice never computes what it hides.** The banner names the dimension,
+  the policy and the reason. It does *not* count the withheld slices — that count would
+  require running the unrestricted drill, i.e. computing the very answer the reader is
+  not entitled to.
+
+Scope, honestly: this is **dimension-level** entitlement. It is not row-level security,
+not measure-level, and not authentication — the role comes from the persona selector,
+not a login. Full reasoning and the named gaps in
+[`docs/roles_decisions.md`](docs/roles_decisions.md).
 
 ---
 

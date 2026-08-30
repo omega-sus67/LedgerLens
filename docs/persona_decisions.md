@@ -306,6 +306,20 @@ changes which cuts are drilled, which changes the payload itself. Task 4 **must*
 they are not entitled to see. The warning is in the function's own docstring, where
 whoever does task 4 will read it.
 
+> **Settled in task 4 (2026-08-30).** The key is now
+> `(metric, as_of_iso, cohort_key, window_key, role_key)`, and persona is still
+> deliberately absent from it. `tests/test_app.py::test_switching_persona_recomputes_instead_of_serving_a_stale_payload`
+> asserts it, and was verified to fail when `who.role` is dropped from the call — so it
+> is a real guard, not a tautology. **Task 7's `drop_sources` and task 5's feedback go
+> in this same signature.** See [`roles_decisions.md`](roles_decisions.md) D10.
+>
+> **One gap the boundary does not cover.** `app.py`'s manual-window path builds a cohort
+> dict directly and bypasses `anomaly.drill()`, which is where entitlement is enforced.
+> It is unreachable today — that path exists only for `status="sparse_history"` KPIs, and
+> `payment_success_rate` declares no `AccessRule` — but it is a hole in the shape of the
+> feature and is named in the roadmap rather than quietly omitted.
+> See [`roles_decisions.md`](roles_decisions.md) D7.
+
 ---
 
 ## 11. What is deliberately not here
