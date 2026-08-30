@@ -163,7 +163,14 @@ LLM_PROVIDER = os.environ.get("LEDGERLENS_LLM_PROVIDER", "gemini")
 LLM_MODEL_OVERRIDE = os.environ.get("LEDGERLENS_LLM_MODEL", "")
 
 LLM_TIMEOUT_S = 30.0
-LLM_MAX_OUTPUT_TOKENS = 2048
+# Headroom, not a target. Gemini 2.5 bills THINKING tokens against this budget, and
+# at 2048 a measured 1,964 thinking tokens left 68 for the answer -- the JSON
+# truncated mid-string and two of the three call sites silently fell back to the
+# template. `llm.py` also caps thinking; this is the second line of defence.
+LLM_MAX_OUTPUT_TOKENS = 4096
+# One retry, on 5xx only. Gemini returns a transient 503 under load and a single
+# lost call empties a whole panel with no explanation on screen.
+LLM_RETRY_BACKOFF_S = 2.0
 # Temperature 0 everywhere. The investigator lane is additive to a deterministic
 # spine; sampling variance in it buys nothing and costs reproducibility on stage.
 LLM_TEMPERATURE = 0.0

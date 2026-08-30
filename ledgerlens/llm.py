@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -174,18 +175,38 @@ class GeminiProvider:
                 "responseSchema": _to_gemini_schema(schema),
                 "temperature": config.LLM_TEMPERATURE,
                 "maxOutputTokens": config.LLM_MAX_OUTPUT_TOKENS,
+                # Gemini 2.5 models think by default, and thinking tokens are billed
+                # against maxOutputTokens. Measured on the proposed-checks prompt:
+                # 1,964 thinking tokens of a 2,048 budget, 68 left for the answer,
+                # JSON truncated mid-string -> JSONDecodeError -> silent fallback to
+                # the template. Every call site here is structured extraction against
+                # a fixed schema; there is nothing to reason about, and
+                # `temperature = 0` already declares that intent.
+                #
+                # Flash accepts a zero budget. Pro does NOT -- its minimum is 128 --
+                # and `LEDGERLENS_LLM_MODEL=gemini-2.5-pro` is a documented override,
+                # so a flat zero would 400 the moment someone used it.
+                "thinkingConfig": {"thinkingBudget": 128 if "pro" in self.spec.model else 0},
             },
         }
         url = f"{self.BASE}/{self.spec.model}:generateContent"
-        try:
-            r = httpx.post(
-                url,
-                json=body,
-                headers={"x-goog-api-key": self._key},
-                timeout=config.LLM_TIMEOUT_S,
-            )
-        except Exception as exc:  # network, DNS, timeout
-            return None, Usage(), f"transport error ({type(exc).__name__})"
+        # Retry once, on 5xx only. A 503 ("model overloaded") is transient and common
+        # on free tiers; a 4xx is a bad key or a rejected schema and will fail again,
+        # so retrying it only doubles the latency before the same message.
+        r = None
+        for attempt in (1, 2):
+            try:
+                r = httpx.post(
+                    url,
+                    json=body,
+                    headers={"x-goog-api-key": self._key},
+                    timeout=config.LLM_TIMEOUT_S,
+                )
+            except Exception as exc:  # network, DNS, timeout
+                return None, Usage(), f"transport error ({type(exc).__name__})"
+            if r.status_code < 500 or attempt == 2:
+                break
+            time.sleep(config.LLM_RETRY_BACKOFF_S)
         if r.status_code != 200:
             return None, Usage(), f"HTTP {r.status_code}"
         try:

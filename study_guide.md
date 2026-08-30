@@ -434,6 +434,7 @@ For a returning reader who knows what they want.
 | [`docs/abstention_decisions.md`](docs/abstention_decisions.md) | reachable refusal |
 | [`docs/ai_decisions.md`](docs/ai_decisions.md) | the investigator lane, end to end |
 | [`docs/learning_decisions.md`](docs/learning_decisions.md) | the feedback loop |
+| [`docs/postwork_decisions.md`](docs/postwork_decisions.md) | the submission-hardening pass: proposal framing, demo figures |
 | [`docs/business_proposal.md`](docs/business_proposal.md) | the Round 2 proposal + three scorecard appendices |
 | [`docs/demo_script.md`](docs/demo_script.md) | the video shot script |
 | [`docs/design/IMPLEMENTATION_SPEC.md`](docs/design/IMPLEMENTATION_SPEC.md) | the original build contract |

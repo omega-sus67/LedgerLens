@@ -363,3 +363,44 @@ def test_incomplete_unverified_entries_are_dropped(store, focal):
     )
     out = investigator.unverified_causes(store, f, ranked, None, frozenset(), llm.Budget(), provider)
     assert len(out) == 1 and out[0].description == "macro shift"
+
+
+# ------------------------------------------------- the causal-claim guard (task 8b)
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        "mrr_renewals fell 85.2% due to deploy_sepa_v214.",
+        "The drop was caused by the SEPA connector release.",
+        "Renewals collapsed because of the payment deploy.",
+        "The release led to a shortfall in DACH.",
+        "deploy_sepa_v214 is responsible for the DACH shortfall.",
+        "The root cause was the connector rework.",
+        "The shortfall is attributable to the SEPA release.",
+    ],
+)
+def test_the_claim_guard_rejects_prose_that_asserts_a_cause(prose):
+    """The card says outright that it does not prove causation, in the summary
+    printed directly beneath the headline. Prose asserting a cause contradicts the
+    card it sits on, on the same screen -- which is worse than an ugly sentence."""
+    assert investigator.claim_guard(prose), f"causal claim slipped through: {prose!r}"
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        "DACH renewals are down 35% -- not attributable to campaign spend.",
+        "campaign_dach_cut was rejected: the drop was not caused by the budget cut.",
+        "The evidence is most consistent with deploy_sepa_v214.",
+        "This is the leading candidate; it survived all four negative controls.",
+        "The decline did not result from the marketing change.",
+        "Ranked first on cohort match, rather than due to temporal proximity.",
+    ],
+)
+def test_the_claim_guard_allows_denials_and_hedged_language(prose):
+    """Denying a cause is the honest half of this system's job -- the growth card's
+    own headline reads "not attributable to campaign spend", and the second finding
+    turns on saying the campaign did NOT cause this. A guard that rejected those
+    would delete the part of the story that makes the rest credible."""
+    assert investigator.claim_guard(prose) == [], f"wrongly rejected: {prose!r}"

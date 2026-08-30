@@ -521,6 +521,50 @@ def guard(prose: str, corpus: str) -> list[str]:
     return sorted(numbers_in(prose) - numbers_in(corpus))
 
 
+# Phrases that assert causation outright. This system ranks evidence and states, in
+# the summary printed directly beneath the headline, that it does NOT prove
+# causation -- so prose claiming a cause contradicts the card it sits on, on the same
+# screen. The template says "most consistent with" for exactly this reason.
+_CAUSAL = re.compile(
+    r"\b(?:caused by|due to|because of|owing to|thanks to|"
+    r"resulted (?:from|in)|results? (?:from|in)|stems? from|stemmed from|"
+    r"led to|leading to|triggered by|brought about by|"
+    r"attributable to|the (?:root )?cause (?:was|is)|responsible for)\b",
+    re.I,
+)
+
+# A NEGATED causal phrase is not a causal claim -- it is a denial, and denying one is
+# something this system does constantly. The growth card's own headline reads "not
+# attributable to campaign spend", and the second finding turns on saying the
+# campaign did NOT cause this. Rejecting those would gut the honest half of the story.
+_NEGATED = re.compile(r"\b(?:not|never|no|n't|rather than|instead of)\b[\w\s,'-]{0,18}$", re.I)
+
+
+def causal_claims_in(text: str) -> list[str]:
+    """Un-negated causal assertions in `text`. Empty list means clean."""
+    found = []
+    for match in _CAUSAL.finditer(text):
+        if _NEGATED.search(text[max(0, match.start() - 40) : match.start()]):
+            continue
+        found.append(match.group(0).lower())
+    return sorted(set(found))
+
+
+def claim_guard(prose: str) -> list[str]:
+    """The second output guard, and the same trade as the first.
+
+    `guard()` asks where a DIGIT came from. This asks whether the sentence claims
+    more than the engine did. Both discard the narration wholesale rather than
+    editing it, because a guard that rewrites its input is a second author with no
+    evidence -- and the deterministic template is always available and always correct.
+
+    Enforced here rather than requested in the prompt on purpose. The prompt asks too
+    (it lowers the rejection rate), but "the model was told not to" is exactly the
+    by-convention argument this architecture exists to avoid making.
+    """
+    return causal_claims_in(prose)
+
+
 NARRATE_PROMPT = """You are rewriting a finished diagnosis for one specific reader.
 
 READER: {label} ({depth} depth, reads via {channel})
@@ -536,7 +580,18 @@ HARD CONSTRAINT: you may use ONLY the numbers that appear above, exactly as they
 appear. Do not round them, do not restate them in different units, do not compute new
 ones, do not add a percentage or a currency figure of your own. A single invented
 digit causes this narration to be discarded and the template version shown instead.
-Prefer to write without numbers over writing with an approximate one."""
+Prefer to write without numbers over writing with an approximate one.
+
+HARD CONSTRAINT 2: this engine RANKS EVIDENCE and does not prove causation -- the
+summary printed directly beneath your text says so in as many words. Never write that
+the change caused the movement. Do not use "caused by", "due to", "because of",
+"resulted in", "led to", "responsible for" or "attributable to" as an assertion.
+Write that the evidence is most consistent with it, or that it is the leading
+candidate, or that it survived every check that could have falsified it. Prose that
+asserts a cause is discarded and the template version shown instead.
+
+You MAY negate freely: saying a candidate is NOT the cause, or was rejected, is the
+honest half of this system's job and is always allowed."""
 
 
 def narrate_prose(
@@ -576,4 +631,8 @@ def narrate_prose(
     if bad:
         budget.fail("narration", f"numbers guard rejected {bad}")
         return "", "", bad
+    claims = claim_guard(f"{headline} {summary}")
+    if claims:
+        budget.fail("narration", f"causal-claim guard rejected {claims}")
+        return "", "", claims
     return headline, summary, []

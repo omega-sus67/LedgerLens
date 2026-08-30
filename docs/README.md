@@ -27,6 +27,7 @@ one before changing the code it covers.
 | [`abstention_decisions.md`](abstention_decisions.md) | the reachable path to *"nothing connected explains this"* |
 | [`ai_decisions.md`](ai_decisions.md) | **the LLM investigator lane** — the provider seam, the validation gate, the numbers guard |
 | [`learning_decisions.md`](learning_decisions.md) | the analyst feedback loop — a Beta–Bernoulli prior you can delete |
+| [`postwork_decisions.md`](postwork_decisions.md) | **the submission-hardening pass** — the proposal's competitive framing, and the demo script's machine-checked figures |
 
 ## Submission (Round 2)
 

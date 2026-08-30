@@ -6,7 +6,7 @@
 ledger of business changes, verified by negative controls, narrated by an AI
 investigator that proposes but never decides.*
 
-**Repository:** https://github.com/omega-sus67/LedgerLens · **307 passing tests** ·
+**Repository:** https://github.com/omega-sus67/LedgerLens · **343 passing tests** ·
 runs end to end with no API key
 
 ---
@@ -68,6 +68,21 @@ the failure mode this system is built to eliminate.
 | Contradictory evidence, confidence calibration | A confident wrong answer is worse than no answer |
 | Role-based security and sensitive dimensions | The same question must return different cuts to different readers |
 | LLM economics — model choice, tokens, latency, cost | An LLM in the scoring loop is unbounded cost *and* unbounded risk |
+
+### Why now
+
+**Blast radius only became queryable in the last five years.** GitOps, feature-flags-as-a-
+service, campaign platforms with APIs and infrastructure-as-code turned deliberate change
+into machine-readable metadata with *declared* targeting: a deploy records its rollout
+regions, a flag records its targeting rules, a campaign records its geo. A decade ago that
+linkage would have had to be **inferred** from prose — which is precisely the design this
+system rejects, because an inferred link cannot be audited.
+
+The second enabler is LLM economics. At roughly half a cent per diagnosis, a model is cheap
+enough to *propose* additional checks and rewrite prose for a given reader without ever
+being trusted with the verdict. The "propose but never decide" split is affordable now in a
+way it was not when a single call cost dollars and the only way to justify it was to put it
+on the critical path.
 
 ### The claim we deliberately do **not** make
 
@@ -213,6 +228,29 @@ branching would follow.
   than the data — runtime telemetry and policy redactions — and both say so on screen
   rather than leaving a gap to be noticed.
 
+### 2.8 How this differs from what already exists
+
+| Category | What it does | Where it stops |
+|---|---|---|
+| Dashboards — Power BI, Tableau, Looker | Report *what* moved | No *why* at all |
+| Anomaly detection — Anodot, Monte Carlo | Detect that something moved, and alert | Detects; never explains |
+| Augmented analytics — ThoughtSpot SpotIQ, Sisu | Rank contributing drivers statistically **within the warehouse** | Only sees columns. **A deploy is not a column.** |
+| LLM copilots — Databricks Genie, Power BI Copilot | Natural-language Q&A over the data | The model *composes* the answer, so a confidently wrong one is indistinguishable from a right one — and neither is auditable |
+| **LedgerLens** | Intersects the anomaly with a **ledger of business changes**, then tries to *falsify* each candidate | Does not prove causation — and says so on the card |
+
+The distinction is not incremental:
+
+> **The cause of a metric movement is almost never in the metric's own table.** Every tool
+> above searches the *data* for the answer. LedgerLens searches the **change log** — and
+> then tries to disprove what it finds.
+
+Two consequences follow, and both are structural rather than a matter of tuning. Because
+candidates come from a change ledger rather than from column statistics, a cause with no
+statistical signature in the warehouse — a connector release, a flag flip — is still
+findable. And because ranking is by *survived falsification* rather than by correlation
+strength, the plausible-but-wrong candidate is **rejected outright** rather than merely
+placed second. A decoy still on the list is one an executive might act on.
+
 ---
 
 ## 3. Target users
@@ -293,6 +331,45 @@ metadata to blast radius. A deploy already knows its rollout regions, a feature 
 its targeting rules, a campaign knows its geo, a ticket knows its account and the account
 knows its segment. **The linkage is already recorded; it does not need to be inferred.**
 
+### 4.5 Delivery shape
+
+**This is an engagement, not a product install** — which is what makes it a reusable asset
+rather than a one-off build.
+
+The engine is constant across customers. **The connector mapping is the deliverable**: the
+declared translation from a client's existing deploy, flag, campaign and ticketing metadata
+into blast-radius predicates. That is client-specific *configuration*, not custom
+engineering, and it is the billable work — a 6–8 week shape for a first KPI family, with
+each additional source a matter of days rather than a rebuild.
+
+Three properties make it land inside an enterprise rather than beside one:
+
+- **No new infrastructure.** The engine is SQL. It executes warehouse-native against the
+  client's existing Snowflake, Databricks or BigQuery, so there is nothing to push through
+  procurement and no second copy of the data to govern.
+- **It clears risk and audit on the first pass.** Every number carries a replayable
+  `query_id`, and the two exceptions say so on screen. In practice this — not accuracy — is
+  what decides whether an analytics tool ever reaches production.
+- **It fails safely in front of a client.** The system abstains rather than guessing, and
+  names the feed it is missing. A pilot that says *"I cannot explain this yet, connect
+  GitHub"* is a pilot that survives its first surprise.
+
+### 4.6 How we would know it is working
+
+The feedback loop already collects the product's own success metric: analyst verdicts are
+rows in a table, so confirmation rate is a query rather than a survey.
+
+| Metric | Definition | Target direction |
+|---|---|---|
+| **Confirmation rate** | analyst 👍 ÷ total verdicts on ranked candidates | up, and *stated* rather than assumed |
+| **Time to defensible diagnosis** | request → card with evidence | down; the baseline is ~3 analyst-days |
+| **Misattribution avoided** | candidates rejected by a decisive control that were ranked first on T alone | the decoy case, counted |
+| **Abstention rate** | diagnoses closing with no candidate above the floor | **non-zero, and monitored as a health metric** |
+
+That last row is the one we would watch hardest. A system that never says *"I don't know"*
+has not become more accurate — it has stopped being honest, and a falling abstention rate
+is therefore an alarm rather than an improvement.
+
 ---
 
 ## 5. Phased roadmap
@@ -302,7 +379,7 @@ knows its segment. **The linkage is already recorded; it does not need to be inf
 Three KPIs across three sources with different grains; semantic contract; drill-down with
 contribution; five-component scoring; five negative-control rules; four personas; role
 entitlement; abstention; the AI investigator lane; the analyst feedback loop; runtime
-telemetry. **307 tests. All ten Minimum Prototype Expectations close.**
+telemetry. **343 tests. All ten Minimum Prototype Expectations close.**
 
 ### Phase 1 — Rigour (1–2 months)
 

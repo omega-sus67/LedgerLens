@@ -21,3 +21,9 @@ improvements.md
 # Submission inputs: local until you fill them (team name, video URL)
 submission/.team_name
 submission/.video_url
+
+# Presenter's manual for the demo recording. Local working notes about driving the
+# UI on camera -- cache behaviour, pre-warm order, which control to touch when. It
+# describes the recording session, not the system; docs/demo_script.md is the
+# committed artefact and the only one whose numbers are guarded by a test.
+operation_guide.md

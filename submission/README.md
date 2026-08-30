@@ -15,7 +15,17 @@ The prototype video is recorded by hand — see [`../docs/demo_script.md`](../do
 
 ## Rebuilding
 
-The PDFs are `markdown` -> styled HTML -> headless Chrome. The deck is
+**The PDFs are scripted.** [`../docs/taskflow/build_pdfs.py`](../docs/taskflow/build_pdfs.py)
+renders both from their markdown sources (markdown -> styled HTML -> headless Chrome), so
+they cannot drift from the documents they represent:
+
+```bash
+uv run --with markdown python docs/taskflow/build_pdfs.py
+```
+
+Re-run it after **any** edit to `README.md` or `docs/business_proposal.md`.
+
+The deck is
 [`../docs/taskflow/build_deck.py`](../docs/taskflow/build_deck.py), which opens the Round 1
 file so the Accenture master, theme and 16:9 geometry carry over, keeps slides 1-4 and the
 closing two, and inserts the Round 2 content between them. It also recompresses the
@@ -34,6 +44,12 @@ survives and the script says so on stdout.
 |---|---|
 | `submission/.team_name` | slide 2's `[ADD TEAM NAME]` |
 | `submission/.video_url` | slide 17's `[ADD VIDEO LINK HERE]` |
+
+> **Known gap — the deck predates four proposal sections.** `build_deck.py` carries its
+> Round 2 content inline, so §1 *Why now*, §2.8 *How this differs from what already exists*,
+> §4.5 *Delivery shape* and §4.6 *How we would know it is working* are in the proposal and
+> the PDF but **not** in the slides. Adding them means editing `build_deck.py`, not
+> re-running it.
 
 **Slide 2 also carries stock template headshots for both team members.** They are the
 Round 1 file's placeholder images, not photographs of anyone on this team - replace them

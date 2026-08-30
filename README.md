@@ -41,28 +41,97 @@ Three further things stated plainly:
 
 ## Run it
 
+**You need:** Python 3.12 and about two minutes. **You do not need an API key** — the whole
+demo, and all 343 tests, run without one.
+
+### 1. Install
+
 ```bash
+git clone https://github.com/omega-sus67/LedgerLens.git
+cd LedgerLens
+
+# with uv (fastest)
 uv venv --python 3.12
 uv pip install --python .venv/bin/python -r requirements.txt
 
-.venv/bin/python -m ledgerlens.gen_data    # writes data/*.parquet, *.json, ground_truth.json
-.venv/bin/python -m pytest -q              # 307 tests
-.venv/bin/python -m ledgerlens.pipeline    # prints the diagnosis card to stdout
-.venv/bin/python -m streamlit run app.py   # the analyst UI
+# or with plain Python, if you don't have uv
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
-No API key required — and that is a design property, not a limitation. Everything on the ranking path is deterministic Python and SQL, so the full test suite and the entire demo run with no API key set.
-
-**The AI investigator is the layer on top of that, and it is optional by construction.** Export a key and tick one sidebar box to enable it:
+### 2. Build the data, then look at it
 
 ```bash
-export GEMINI_API_KEY=...                       # default provider
+.venv/bin/python -m ledgerlens.gen_data     # ~10s. Writes data/ from SEED=20260815
+.venv/bin/python -m ledgerlens.pipeline     # prints a full diagnosis to your terminal
+```
+
+`data/` is empty when you clone, and that is deliberate: it is deterministic generator
+output, so the repo carries the generator instead of the data. `gen_data` rebuilds every
+byte of it, identically, on any machine.
+
+The second command is the fastest way to see what this does — a complete diagnosis card,
+evidence chain and recommended actions, printed as text.
+
+### 3. Open the app
+
+```bash
+.venv/bin/python -m streamlit run app.py    # http://localhost:8501
+```
+
+### 4. Try these four things, in this order
+
+The demo is built around one incident: renewals in DACH collapsed on 3 August. Everything
+below works out of the box at the default settings (`mrr_renewals`, as-of `2026-08-17`).
+
+| # | Do this | What to look for |
+|---|---|---|
+| 1 | Scroll to **Hypotheses** and find the red **REJECTED** card | A marketing campaign that is *more* temporally plausible than the true cause — and was killed anyway. Its **N** score sits at zero, and the pink row in its control table shows which check killed it |
+| 2 | Scroll to **Recommended actions** | The `[P2]` line: the same campaign is innocent here but *guilty of something else*, with the query behind it |
+| 3 | Switch **Persona** to `Growth Marketing` (sidebar) | The 🔒 banner. The numbers legitimately change, and the card names the policy that withheld the data rather than silently omitting it |
+| 4 | Tick **Deploy source (github) not connected** (sidebar) | The system **refuses to name a cause**, says which feeds are missing, and tells you what to connect |
+
+Every number on screen has a query behind it. Expand **🔍 show the queries behind this card**
+on any hypothesis to see the exact SQL and its logged result.
+
+### 5. Optional: turn on the AI investigator
+
+```bash
+export GEMINI_API_KEY=...                    # free key from Google AI Studio works
 .venv/bin/python -m streamlit run app.py
 ```
 
-It adds three LLM call sites — proposed checks, unverifiable causes, and persona-voiced prose — and **none of them can change a rank**. The system is provider-agnostic: `LEDGERLENS_LLM_PROVIDER=anthropic` switches vendor with no source change, and `LEDGERLENS_LLM_MODEL=gemini-2.5-pro` swaps the model within one. See [**LLM versus non-LLM**](#llm-versus-non-llm-and-what-a-diagnosis-costs) below and [`docs/ai_decisions.md`](docs/ai_decisions.md) for the full design.
+Then tick **Run the AI investigator** in the sidebar. It adds three LLM call sites —
+proposed checks, unverifiable causes, and persona-voiced prose — and **none of them can
+change a rank**. Roughly half a cent per diagnosis.
 
-> On this machine a ROS install pollutes `PYTHONPATH`. If `pytest` fails importing `yaml`, prefix commands with `env -u PYTHONPATH -u VIRTUAL_ENV`.
+Provider-agnostic: `LEDGERLENS_LLM_PROVIDER=anthropic` switches vendor with no source
+change, and `LEDGERLENS_LLM_MODEL=...` swaps the model within one. See
+[**LLM versus non-LLM**](#llm-versus-non-llm-and-what-a-diagnosis-costs) below and
+[`docs/ai_decisions.md`](docs/ai_decisions.md).
+
+### Verify it yourself
+
+```bash
+.venv/bin/python -m pytest -q                # 343 tests, no API key needed
+```
+
+The suite is the claim. `tests/test_pipeline.py` walks a finished card, collects every
+`query_id` on it, and asserts each one still reproduces its logged output — so "every number
+is auditable" is enforced rather than asserted.
+
+### If something goes wrong
+
+| Symptom | Fix |
+|---|---|
+| `yaml` import error, or odd import failures | A ROS install is polluting `PYTHONPATH`. Prefix commands with `env -u PYTHONPATH -u VIRTUAL_ENV` |
+| `IO Error: Could not set lock on file ... duckdb` | Another Streamlit or pytest process holds the database. Close it — the lock is exclusive |
+| Empty `data/` or "file not found" | Run `python -m ledgerlens.gen_data` first |
+| AI checkbox greyed out | `GEMINI_API_KEY` is not visible to the server. Export it, then restart Streamlit — reloading the browser is not enough |
+
+**New to the codebase?** [`study_guide.md`](study_guide.md) is an ordered path through every
+document and source file, with checkpoints. [`docs/how_it_works.md`](docs/how_it_works.md)
+teaches the vocabulary from zero.
 
 ---
 
@@ -477,7 +546,7 @@ ledgerlens/
   llm.py                      provider seam: gemini + anthropic adapters
   investigator.py             the LLM lane: proposed checks, unverified causes, guard
   pipeline.py                 orchestration
-tests/                        307 tests; test_pipeline.py is the acceptance test
+tests/                        343 tests; test_pipeline.py is the acceptance test
 docs/
   how_it_works.md             start here if the vocabulary is new
   ai_decisions.md             the LLM lane, end to end

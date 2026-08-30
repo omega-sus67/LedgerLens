@@ -17,7 +17,7 @@ deliberately; don't let this file duplicate or drift from it.
 
 ## Current state (as of 2026-08-30)
 
-- Deterministic core is done and stable: **307 tests passing**, decoy-rejection demo
+- Deterministic core is done and stable: **343 tests passing**, decoy-rejection demo
   works end-to-end, README's claims verified against the code.
 - **Tasks 1, 2, 3, 4, 6 and 7 are done** (KPI semantic contract; personas + `Action`
   reshape; third KPI with sparse history; role-based entitlement; telemetry panel;

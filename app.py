@@ -656,10 +656,12 @@ if investigate or card.proposed_tests or card.unverified:
         )
     elif investigate and card.telemetry and card.telemetry.llm_guard_rejections:
         st.error(
-            f"✍️ The model's prose was **discarded**: it introduced "
-            f"{card.telemetry.llm_guard_rejections} which appear nowhere in the verified "
-            f"payload. You are reading the deterministic template instead. This is the "
-            f"guard working, not the system failing."
+            f"✍️ The model's prose was **discarded** by an output guard — "
+            f"`{'`, `'.join(card.telemetry.llm_guard_rejections)}`. Either a figure "
+            f"appears nowhere in the verified payload, or the prose asserted a **cause** "
+            f"this system does not claim (it ranks evidence). The exact reason is in "
+            f"*Lane failures* below. You are reading the deterministic template instead. "
+            f"This is the guard working, not the system failing."
         )
 
     if card.telemetry and card.telemetry.llm_failures:
