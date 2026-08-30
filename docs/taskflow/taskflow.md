@@ -21,9 +21,9 @@ Landed since this file was first written:
 
 | Task | Closed | Record |
 |---|---|---|
-| **1 — KPI semantic contract** ✅ | contract, grains/cadences, freshness, lineage | [`docs/contracts_decisions.md`](../docs/contracts_decisions.md) |
-| **2 — Personas + `Action` reshape** ✅ | persona narratives, levers/decision rights, confidence | [`docs/persona_decisions.md`](../docs/persona_decisions.md) · [`task_persona.md`](task_persona.md) |
-| **3 — Third KPI, sparse history** ✅ | 3 KPIs / 3 sources, sparse-history scenario, ratio aggregation | [`docs/sparse_kpi_decisions.md`](../docs/sparse_kpi_decisions.md) · [`task_sparse_kpi.md`](task_sparse_kpi.md) |
+| **1 — KPI semantic contract** ✅ | contract, grains/cadences, freshness, lineage | [`docs/contracts_decisions.md`](../contracts_decisions.md) |
+| **2 — Personas + `Action` reshape** ✅ | persona narratives, levers/decision rights, confidence | [`docs/persona_decisions.md`](../persona_decisions.md) · [`task_persona.md`](task_persona.md) |
+| **3 — Third KPI, sparse history** ✅ | 3 KPIs / 3 sources, sparse-history scenario, ratio aggregation | [`docs/sparse_kpi_decisions.md`](../sparse_kpi_decisions.md) · [`task_sparse_kpi.md`](task_sparse_kpi.md) |
 
 ### The three things that would have bitten us — **all closed by Task 0 ✅**
 
@@ -96,11 +96,11 @@ single one of them is fatal. The cut below follows that distinction.
 **Task 8 was un-cut on Aug 30 and built.** The reason it came back: this is an *AI*
 innovation challenge and the prototype made **zero LLM calls**, so the telemetry panel
 reported `0 calls / $0.0000` as its entire AI story. The lane was already specified in
-`businessintelligence-ai-redesign.md` sec 4.9 and every model it needed
+`../design/businessintelligence-ai-redesign.md` sec 4.9 and every model it needed
 (`ProposedTest`, `UnverifiedHypothesis`, `Telemetry.llm_*`, `generated_by`) was already
 declared and never populated -- so it was a wiring job, not a design job. It also made
 the system **provider-agnostic** (Gemini Flash by default, Anthropic by env var).
-Rationale: [`docs/ai_decisions.md`](../docs/ai_decisions.md). Site 1 of the four spec'd
+Rationale: [`docs/ai_decisions.md`](../ai_decisions.md). Site 1 of the four spec'd
 call sites (the LLM event normalizer) stays cut, because it is the only one that is not
 additive -- see D2.
 
@@ -180,7 +180,7 @@ work. It is Task 0 for that reason.
 ## Task 4 — Role-based entitlement ✅ **DONE**
 
 > **Landed 2026-08-30** on `task-4-entitlement`. Decisions:
-> [`docs/roles_decisions.md`](../docs/roles_decisions.md). Plan as executed:
+> [`docs/roles_decisions.md`](../roles_decisions.md). Plan as executed:
 > [`roles_tasks.md`](roles_tasks.md). Three errors in the sketch below were corrected
 > during implementation — the scores are *not* identical across roles, the engine must
 > use the *lenient* contract lookup, and `run()` had no `persona` parameter. The
@@ -202,7 +202,7 @@ The machinery all exists, and Task 2 wired the last missing piece:
 
 ### 4.1 — Thread the role into drill
 
-[`pipeline.py:60`](../ledgerlens/pipeline.py#L60) currently passes the global list:
+[`pipeline.py:60`](../../ledgerlens/pipeline.py#L60) currently passes the global list:
 
 ```python
 nodes = anomaly.drill(store, root, config.DRILL_DIMS)
@@ -245,7 +245,7 @@ Policy id and reason come from the `AccessRule`, never hardcoded.
 `app.py` already has `who = personas.get(persona_id)`. Pass `who.role` into
 `load_payload`, **and add it to the cache key** — entitlement changes which dims are
 drilled, so it changes the payload. This is the half of the cache-key debt
-[`docs/persona_decisions.md`](../docs/persona_decisions.md) §10 explicitly left unpaid,
+[`docs/persona_decisions.md`](../persona_decisions.md) §10 explicitly left unpaid,
 and the docstring on `load_payload` says so.
 
 **Test** (`tests/test_entitlement.py`):
@@ -289,7 +289,7 @@ redaction line is what makes it read as policy rather than breakage. Do not skip
 ## Task 6 — Telemetry panel ✅ **DONE**
 
 > **Landed 2026-08-30** on `task-6-telemetry`. Decisions:
-> [`docs/telemetry_decisions.md`](../docs/telemetry_decisions.md). Plan as executed:
+> [`docs/telemetry_decisions.md`](../telemetry_decisions.md). Plan as executed:
 > [`telemetry_tasks.md`](telemetry_tasks.md). Three errors in the sketch below were
 > corrected during implementation — `queries` is three different numbers and the draft
 > picked the one that understates the work ~6x; the five-stage assertion breaks on the
@@ -377,7 +377,7 @@ it to make telemetry look good.
 ## Task 7 — Abstention demo path ✅ **DONE**
 
 > **Landed 2026-08-30** on `task-7-abstention`. Decisions:
-> [`docs/abstention_decisions.md`](../docs/abstention_decisions.md). The sketch below is
+> [`docs/abstention_decisions.md`](../abstention_decisions.md). The sketch below is
 > right about the mechanism and the risk (the decoy does stay rejected, at 0.322), but
 > missed one thing: `_no_cause_card` hardcoded its connectivity prose, so the simulation
 > made the card claim github was connected while the demo said it was not. Connectivity
@@ -487,7 +487,7 @@ Mostly assembly — the material exists:
 
 | Section | Source |
 |---|---|
-| Problem framing | `README.md` opening + `businessintelligence-ai-redesign.md` |
+| Problem framing | `README.md` opening + `docs/design/businessintelligence-ai-redesign.md` |
 | Solution design | the three `docs/*_decisions.md` |
 | Target users | the four personas, with channels and decision rights |
 | Business case | the −$410k incident: days of analyst time vs a sub-second diagnosis |

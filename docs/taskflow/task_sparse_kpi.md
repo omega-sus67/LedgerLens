@@ -23,12 +23,12 @@ roughly double it. **The submission is 2026-08-30 and tasks 4–7 are also non-n
 checklist rows**, so this needs a decision before a line is written.
 
 **Hidden dependency 1 — the fact table is additive; a rate is not.**
-`Store.series()` is `SELECT date, SUM(value) …` ([store.py:148](../ledgerlens/store.py#L148)).
+`Store.series()` is `SELECT date, SUM(value) …` ([store.py:148](../../ledgerlens/store.py#L148)).
 Summing a 98% success rate across 99 slices yields 9702%. Every number in the system
 flows through this one function, so a ratio KPI cannot be bolted on beside it.
 
 **Hidden dependency 2 — `evaluate()` sums across days.**
-`actual = float(win.sum())` ([anomaly.py:117](../ledgerlens/anomaly.py#L117)). Over a
+`actual = float(win.sum())` ([anomaly.py:117](../../ledgerlens/anomaly.py#L117)). Over a
 14-day window a rate series sums to ~13.7, which is meaningless to display.
 `delta_pct` survives (a ratio of equal-length sums equals a ratio of means), but
 `actual`, `expected` and `delta_abs` do not.
@@ -151,7 +151,7 @@ KPI while every test about the *other* KPIs stays green. Task B tests it directl
 ### 2.3 Ratio KPIs are manual-window only — and that is a real limitation, not a dodge
 
 `drill()` computes `contribution = ev.delta_abs / (node.actual - node.expected)`
-([anomaly.py:307](../ledgerlens/anomaly.py#L307)). Contribution analysis **assumes
+([anomaly.py:307](../../ledgerlens/anomaly.py#L307)). Contribution analysis **assumes
 additivity**: a parent's delta is the sum of its children's. A rate has no such
 decomposition — a cohort's rate movement is a mix effect plus a within-slice effect,
 and splitting those needs a method we do not have.
@@ -171,7 +171,7 @@ than a silent wrong answer.
 `taskflow.md` says "~45 days". That number does not work, and the failure is not
 obvious:
 
-- `fit_pre_window()` hard-requires `len(pre) >= 30` ([anomaly.py:73](../ledgerlens/anomaly.py#L73)).
+- `fit_pre_window()` hard-requires `len(pre) >= 30` ([anomaly.py:73](../../ledgerlens/anomaly.py#L73)).
 - The demo runs at `DEFAULT_AS_OF = 2026-08-17`, **not** at `GEN_END = 2026-08-31`.
 - A 14-day manual window ending at `as_of` starts 2026-08-04. It needs ≥30 pre-window
   days before that, i.e. data from 2026-07-05 or earlier.

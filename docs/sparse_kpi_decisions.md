@@ -5,7 +5,7 @@ and [`persona_decisions.md`](persona_decisions.md) (task 2). This one covers
 **`payment_success_rate`**: a third KPI that is deliberately too young to detect, and
 the ratio-aggregation work it forced.
 
-The plan is [`taskflow/task_sparse_kpi.md`](../taskflow/task_sparse_kpi.md). It records
+The plan is [`taskflow/task_sparse_kpi.md`](taskflow/task_sparse_kpi.md). It records
 the *reasoning*; this file records what shipped and where it differs.
 
 **Status:** landed. **181 tests pass** (`160` before task 3, `+21`).

@@ -4,7 +4,7 @@ Companion to [`contracts_decisions.md`](contracts_decisions.md). That document c
 the KPI semantic contract (task 1); this one covers **personas and the `Action`
 reshape** (task 2). Read [`README.md`](../README.md) first for what the system does.
 
-The plan this was built from is [`taskflow/task_persona.md`](../taskflow/task_persona.md).
+The plan this was built from is [`taskflow/task_persona.md`](taskflow/task_persona.md).
 It is kept because it records the *reasoning* — this file records what actually shipped
 and why it differs where it does.
 

@@ -10,7 +10,7 @@ entitlement scenario"* — the last uncovered row on that list.
 Companion docs: [`contracts_decisions.md`](contracts_decisions.md) (where `AccessRule`
 came from), [`persona_decisions.md`](persona_decisions.md) (the persona/payload
 boundary this task extends). The implementation plan is
-[`taskflow/roles_tasks.md`](../taskflow/roles_tasks.md).
+[`taskflow/roles_tasks.md`](taskflow/roles_tasks.md).
 
 ---
 

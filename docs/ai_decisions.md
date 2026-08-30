@@ -13,7 +13,7 @@ cache-key boundary this extends).
 
 ## 1. What was wrong
 
-`businessintelligence-ai-redesign.md` §4.9 — *"the investigator lane (added after
+[`design/businessintelligence-ai-redesign.md`](design/businessintelligence-ai-redesign.md) §4.9 — *"the investigator lane (added after
 review — how the LLM earns its slide)"* — specifies four LLM call sites. **None of
 them had been built.** What existed was a set of sockets with nothing plugged in:
 

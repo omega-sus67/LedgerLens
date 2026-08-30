@@ -559,7 +559,7 @@ git commit -m "feat(narrate): state the redaction, name the policy, cite the rea
 **Files:** Modify `app.py:30-52`, `app.py:128`. Test `tests/test_app.py`.
 
 This is the half of the cache-key debt that
-[`docs/persona_decisions.md`](../docs/persona_decisions.md) §10 left unpaid, and that
+[`docs/persona_decisions.md`](../persona_decisions.md) §10 left unpaid, and that
 `load_payload`'s docstring warns about. **Fix the signature once here**, leaving room for
 Task 7's `drop_sources`.
 

@@ -6,7 +6,7 @@ answer is a bug.
 
 Closes Minimum Prototype Expectation row 7. Full rationale in
 docs/roles_decisions.md; the plan this file was written against is
-taskflow/roles_tasks.md.
+docs/taskflow/roles_tasks.md.
 """
 
 from __future__ import annotations

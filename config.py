@@ -1,6 +1,7 @@
 """Constants, paths, weights and thresholds. Everything tunable lives here.
 
-Values marked SPEC-GAP deviate from IMPLEMENTATION_SPEC.md; each carries its reason.
+Values marked SPEC-GAP deviate from docs/design/IMPLEMENTATION_SPEC.md; each carries
+its reason.
 """
 
 from __future__ import annotations

@@ -417,7 +417,7 @@ MAD uses medians, which ignore extremes. It is the difference between *average* 
   account of what it does *not* claim.
 - **[contracts_decisions.md](contracts_decisions.md)** — every design decision inside
   `contracts.py` and why it went that way. Readable now that you have this page.
-- **[taskflow/taskflow.md](../taskflow/taskflow.md)** — what is still unbuilt.
+- **[taskflow/taskflow.md](taskflow/taskflow.md)** — what is still unbuilt.
 
 **The one-sentence version:** LedgerLens narrows a broken number to the exact slice that
 broke, intersects that slice with everything the company deliberately changed, then tries

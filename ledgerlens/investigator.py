@@ -1,6 +1,7 @@
 """The investigator lane: the LLM proposes, the deterministic engine disposes.
 
-This is the module `businessintelligence-ai-redesign.md` section 4.9 specifies and
+This is the module `docs/design/businessintelligence-ai-redesign.md` section 4.9
+specifies and
 nothing built. Three call sites, all ADDITIVE to the deterministic spine:
 
   site 2  propose_tests()      -- extra checks, filled from a fixed template

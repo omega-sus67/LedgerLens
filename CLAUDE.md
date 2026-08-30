@@ -39,7 +39,7 @@ deliberately; don't let this file duplicate or drift from it.
   reproduce the full diagnosis card with zero data files at checkout. `data/*` is
   gitignored on purpose -- it's deterministic generator output (`SEED = 20260815`)
   -- and that design is correct, not a bug.
-- **`taskflow/taskflow.md` is the live plan**, rewritten 2026-08-29 and cut to
+- **`docs/taskflow/taskflow.md` is the live plan**, rewritten 2026-08-29 and cut to
   essentials. The original twelve tasks were not achievable in the time left; what
   remains is 4 (role-based entitlement), 6 (telemetry panel), 7 (abstention demo path)
   and 12 (submission package), plus conditional 5. Tasks 9-11 remain cut deliberately
@@ -194,7 +194,8 @@ A sidebar switch now simulates the deploy connector never having been wired up.
 ## Done: task 8 -- the investigator lane (the AI)
 
 The repo had **zero LLM calls** on an AI challenge. Not an oversight in the design --
-`businessintelligence-ai-redesign.md` sec 4.9 specifies the lane and nothing built it,
+`docs/design/businessintelligence-ai-redesign.md` sec 4.9 specifies the lane and
+nothing built it,
 leaving `config.MODEL`, `LLM_TEST_BUDGET`, `Telemetry.llm_*`, `generated_by`,
 `ProposedTest` and `UnverifiedHypothesis` as sockets with nothing plugged in.
 **Full rationale in [docs/ai_decisions.md](docs/ai_decisions.md)** -- read it before
@@ -255,7 +256,7 @@ touching `llm.py`, `investigator.py`, `config.PROVIDERS` or the `investigate` fl
   Don't blur that line — it's what makes the contract meaningful rather than
   decorative.
 - **`SPEC-GAP:` comments** in `config.py` mark deliberate, reasoned deviations from
-  `IMPLEMENTATION_SPEC.md`. Read them before "fixing" a threshold that looks
+  `docs/design/IMPLEMENTATION_SPEC.md`. Read them before "fixing" a threshold that looks
   arbitrary — most of them exist to make a specific acceptance test deterministic.
 - **`SEED = 20260815`** throughout; the generator solves scaling constants in
   closed form against target window sums rather than hand-tuned RNG. Don't
@@ -285,7 +286,7 @@ touching `llm.py`, `investigator.py`, `config.PROVIDERS` or the `investigate` fl
 
 ## Deadline context
 
-Submission: **2026-08-30**. The schedule is `taskflow/taskflow.md`'s task order. Tasks
+Submission: **2026-08-30**. The schedule is `docs/taskflow/taskflow.md`'s task order. Tasks
 1-4 and 6-8 are done and merged. **All ten checklist rows close**, and task 8 added the
 LLM lane the challenge is named for.
 Task 12

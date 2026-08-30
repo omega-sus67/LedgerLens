@@ -13,7 +13,7 @@ With these, **ten of ten MPE rows close.**
 
 Companion docs: [`roles_decisions.md`](roles_decisions.md) (the other `query_id`
 carve-out), [`contracts_decisions.md`](contracts_decisions.md). Plan as executed:
-[`taskflow/telemetry_tasks.md`](../taskflow/telemetry_tasks.md).
+[`taskflow/telemetry_tasks.md`](taskflow/telemetry_tasks.md).
 
 ---
 

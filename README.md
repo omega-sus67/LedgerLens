@@ -445,9 +445,15 @@ ledgerlens/
   investigator.py             the LLM lane: proposed checks, unverified causes, guard
   pipeline.py                 orchestration
 tests/                        293 tests; test_pipeline.py is the acceptance test
+docs/
+  how_it_works.md             start here if the vocabulary is new
+  ai_decisions.md             the LLM lane, end to end
+  *_decisions.md              why each subsystem is built the way it is
+  design/                     the original build contract + architecture rationale
+  taskflow/                   the plans these were built from, kept as history
 ```
 
-Deviations from `IMPLEMENTATION_SPEC.md` are marked `# SPEC-GAP:` at the point of departure, with the reason. The substantive ones are the three control-rule fixes described above and the practical-significance gate (`MIN_ABS_DELTA_PCT`) that makes the "no false flag before the incident" test deterministic rather than a coin flip.
+Deviations from [`docs/design/IMPLEMENTATION_SPEC.md`](docs/design/IMPLEMENTATION_SPEC.md) are marked `# SPEC-GAP:` at the point of departure, with the reason. The substantive ones are the three control-rule fixes described above and the practical-significance gate (`MIN_ABS_DELTA_PCT`) that makes the "no false flag before the incident" test deterministic rather than a coin flip.
 
 ## Not built in this cut
 
