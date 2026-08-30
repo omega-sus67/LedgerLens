@@ -38,6 +38,31 @@ OWNER_BY_SOURCE = {
     "zendesk": "support lead",
 }
 
+# Human labels for source systems. These are DISPLAY names only -- which sources
+# exist, and whether they are connected, is read off the contract's lineage. Keeping
+# the two apart is the point: a label that drifts is cosmetic, a connectivity claim
+# that drifts is a lie on the one card whose job is honesty.
+SOURCE_LABEL = {
+    "github": "deploys (github)",
+    "launchdarkly": "feature flags (launchdarkly)",
+    "calendar": "campaigns (calendar)",
+    "pricing_db": "pricing (pricing_db)",
+    "zendesk": "support tickets (zendesk)",
+    "billing_db": "the billing ledger (billing_db)",
+    "psp_webhook": "authorisation events (psp_webhook)",
+    "crm": "the CRM (crm)",
+}
+
+# What feed WOULD carry an anticipated driver we have no connector for. Keyed off
+# contract.anticipated_event_types, so the "known gap" list is declared once in the
+# contract rather than retyped as prose here.
+FEED_FOR_ANTICIPATED = {
+    "vendor_incident": "vendor status feeds",
+    "policy_change": "billing policy change logs",
+    "external": "market, competitor and macroeconomic data",
+}
+
+
 # A neutral phrase for the driver, so a CFO card can name the cause without naming
 # the event id. `show_event_ids` personas append the id themselves.
 DRIVER_LABEL_BY_EVENT_TYPE = {
@@ -87,6 +112,10 @@ class NarrationPayload:
     # What this diagnosis cost. Carried, never recomputed -- narration reports the
     # measurement, it does not take it (except its own stage, which only it can time).
     telemetry: Telemetry | None = None
+    # Source systems simulated as not connected. Narration needs them so the card can
+    # name what is missing instead of asserting a hardcoded connectivity story that
+    # the simulation has just made false.
+    drop_sources: frozenset[str] = frozenset()
 
 
 def _money(x: float) -> str:
@@ -615,12 +644,52 @@ def _cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCa
     )
 
 
+def _connectivity(payload: NarrationPayload) -> tuple[str, str, str]:
+    """Which sources are connected, which are simulated away, and which never existed.
+
+    Read off the KPI's declared lineage rather than asserted in prose. The hardcoded
+    version claimed "Connected sources: deploys (github)..." even while a simulation
+    had disconnected github -- the card contradicting the scenario, in the one branch
+    whose entire purpose is honesty about what we do not have.
+
+    Returns (connected, not_connected, reconnect_target). `reconnect_target` is what
+    the P1 should ask for: the dropped source when one is simulated, because that is a
+    ticket somebody can close, and the standing gap otherwise.
+    """
+    from ledgerlens import contracts
+
+    contract = contracts.CONTRACTS.get(payload.metric)
+    steps = contract.lineage if contract else []
+    evidence_sources = [s.source_system for s in steps if s.kind in ("context", "symptom")]
+
+    live = [s for s in dict.fromkeys(evidence_sources) if s not in payload.drop_sources]
+    dropped = [s for s in dict.fromkeys(evidence_sources) if s in payload.drop_sources]
+
+    anticipated = contract.anticipated_event_types if contract else []
+    never = [
+        FEED_FOR_ANTICIPATED.get(e, f"a feed for {e}")
+        for e in dict.fromkeys(anticipated)
+    ]
+
+    connected = ", ".join(SOURCE_LABEL.get(s, s) for s in live) or "none"
+    parts = []
+    if dropped:
+        names = ", ".join(SOURCE_LABEL.get(s, s) for s in dropped)
+        parts.append(f"{names} — simulated as disconnected for this run")
+    parts.extend(never)
+    not_connected = "; ".join(parts) or "nothing declared"
+
+    reconnect = (
+        ", ".join(dropped) if dropped else ", ".join(never) or "the missing systems"
+    )
+    return connected, not_connected, reconnect
+
+
 def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCard:
     """The honest branch. Nothing may paper over this -- "we cannot explain it from
     the connected sources" is a result, and naming the gap is the feature."""
     focal = payload.focal
-    connected = "deploys (github), feature flags (launchdarkly), campaigns (calendar), pricing (pricing_db), support tickets (zendesk)"
-    missing = "CRM/opportunity data, competitor pricing, macroeconomic indicators, vendor status feeds"
+    connected, not_connected, reconnect = _connectivity(payload)
     best = f" The closest candidate scored {payload.ranked[0].total:.2f}, below the {config.SCORE_FLOOR} floor." if payload.ranked else ""
 
     return DiagnosisCard(
@@ -632,8 +701,8 @@ def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> Diagnosi
             f"The anomaly is real: {cohort_label(focal.cohort)} is {focal.delta_pct:.1f}% below "
             f"baseline ({_format_points(payload.metric, focal.delta_abs)}) over {focal.window.start} to {focal.window.end}."
             f"{best} No recorded change whose blast radius touches this cohort clears the "
-            f"confidence floor. Connected sources: {connected}. Not connected: {missing}. "
-            f"The cause may well sit in one of those."
+            f"confidence floor. Connected sources: {connected}. "
+            f"Not connected: {not_connected}. The cause may well sit in one of those."
             + _redaction_sentence(payload)
         ),
         causal_chain=[
@@ -654,7 +723,7 @@ def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> Diagnosi
                     driver="no recorded change whose blast radius touches this cohort",
                     lever="connect_source",
                     action=(
-                        f"Connect {missing} so the next incident of this shape has "
+                        f"Connect {reconnect} so the next incident of this shape has "
                         f"candidates to test."
                     ),
                     expected_impact=(

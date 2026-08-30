@@ -34,6 +34,7 @@ def load_payload(
     cohort_key: str = "",
     window_key: str = "",
     role_key: str = "",
+    drop_key: str = "",
 ):
     """Cached on everything that changes the PAYLOAD.
 
@@ -44,9 +45,10 @@ def load_payload(
 
     Role is NOT such a concern. Entitlement changes which dimensions are drilled, so
     it changes the focal cohort, so it changes the numbers -- it must join the key.
-    Task 7's `drop_sources` is exactly the same shape and belongs here too; Task 5's
-    feedback likewise. This is the cache-key debt docs/persona_decisions.md sec 10
-    left unpaid, now paid once rather than three times.
+    Task 7's `drop_sources` is exactly the same shape and is here for the same reason:
+    removing a source removes candidates, which changes the answer. Task 5's feedback
+    would go here too. This is the cache-key debt docs/persona_decisions.md sec 10 left
+    unpaid, paid once rather than three times.
     """
     import json
     from datetime import date
@@ -65,6 +67,7 @@ def load_payload(
         cohort=cohort,
         window=window,
         role=role_key or None,
+        drop_sources=frozenset(drop_key.split(",")) if drop_key else frozenset(),
     )
 
 
@@ -91,6 +94,24 @@ st.sidebar.caption(
     f"Delivered to **{who.channel}** · depth `{who.depth}` · "
     f"decision rights: {', '.join(who.decision_rights)}"
 )
+
+st.sidebar.subheader("Simulate a gap")
+drop_deploys = st.sidebar.checkbox(
+    "Deploy source (github) not connected",
+    value=False,
+    help=(
+        "Removes every github-sourced change from candidate generation, as if the "
+        "connector had never been wired up. The true cause stops being a candidate at "
+        "all -- not a candidate that scores badly -- so the engine has nothing above "
+        "its confidence floor and declines to answer."
+    ),
+)
+drop_key = "github" if drop_deploys else ""
+if drop_deploys:
+    st.sidebar.caption(
+        "🔌 Simulating a disconnected deploy feed. The card below should REFUSE to "
+        "name a cause and say what it is missing."
+    )
 
 st.sidebar.subheader("Scoring weights")
 st.sidebar.caption("A product decision, not a hidden hyperparameter.")
@@ -142,7 +163,7 @@ if kpi.status == "sparse_history":
     window_key = json.dumps([w_start.isoformat(), w_end.isoformat()])
 
 store, payload = load_payload(
-    metric, as_of.isoformat(), cohort_key, window_key, who.role
+    metric, as_of.isoformat(), cohort_key, window_key, who.role, drop_key
 )
 card = (
     narrate.narrate(payload, persona=who)

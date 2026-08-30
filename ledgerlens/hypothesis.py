@@ -29,16 +29,26 @@ from ledgerlens.models import (
 from ledgerlens.store import Store
 
 
-def candidates(store: Store, a: Anomaly) -> list[ChangeEvent]:
+def candidates(
+    store: Store, a: Anomaly, drop_sources: frozenset[str] = frozenset()
+) -> list[ChangeEvent]:
     """Events that both PRECEDE the anomaly and could plausibly TOUCH it.
 
     Two filters, both cheap and both deterministic: a time window, then a cohort
     intersection. The US pricing change dies here -- region US against region DACH is
     the empty set, so it never becomes a candidate at all, let alone a ranked one.
+
+    `drop_sources` simulates a source system that is not connected. It is applied HERE,
+    at candidate generation, rather than as a score penalty later -- because an
+    unconnected system does not produce a badly-scoring candidate, it produces no rows
+    at all. Filtering at any later stage would model a different and less honest
+    scenario: one where we saw the change and dismissed it.
     """
     lo = a.onset - timedelta(days=config.LOOKBACK_DAYS)
     out = []
     for ev in store.events():
+        if ev.source in drop_sources:
+            continue
         ts = ev.ts_start.date()
         if ts < lo or ts > a.window.end:
             continue
@@ -177,7 +187,10 @@ def score(
 
 
 def rank(
-    store: Store, a: Anomaly, symptoms: list[SymptomCluster] | None = None
+    store: Store,
+    a: Anomaly,
+    symptoms: list[SymptomCluster] | None = None,
+    drop_sources: frozenset[str] = frozenset(),
 ) -> list[Hypothesis]:
-    hyps = [score(store, a, ev, symptoms) for ev in candidates(store, a)]
+    hyps = [score(store, a, ev, symptoms) for ev in candidates(store, a, drop_sources)]
     return sorted(hyps, key=lambda h: (-h.total, h.event.event_id))

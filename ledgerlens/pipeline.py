@@ -104,6 +104,7 @@ def diagnose(
     cohort: Cohort | None = None,
     window: Window | None = None,
     role: str | None = None,
+    drop_sources: frozenset[str] = frozenset(),
 ) -> narrate.NarrationPayload | None:
     """Everything up to, but not including, prose. Returns None when there is no
     anomaly to explain.
@@ -117,6 +118,9 @@ def diagnose(
     concern: hiding a dimension changes which cuts are drilled, so it changes the
     focal cohort and therefore the numbers. It must enter here, above the caching
     boundary, and `app.py`'s cache key must include it.
+
+    `drop_sources` is the same shape again: simulating a disconnected source removes
+    candidates, which changes the answer. It joins the cache key too.
     """
     store = store or get_store()
     watch = _Stopwatch()
@@ -142,7 +146,9 @@ def diagnose(
 
     focal = anomaly.focal(nodes)
     symptoms = watch.time("symptoms", lambda: symptoms_mod.cluster(store, focal.window))
-    hyps = watch.time("rank", lambda: hypothesis.rank(store, focal, symptoms))
+    hyps = watch.time(
+        "rank", lambda: hypothesis.rank(store, focal, symptoms, drop_sources)
+    )
 
     ranked = [h for h in hyps if h.rejection_reason is None]
     rejected = [h for h in hyps if h.rejection_reason is not None]
@@ -165,6 +171,7 @@ def diagnose(
         seasonal_query_id=seasonal_query_id,
         no_confident_cause=not ranked or ranked[0].total < config.SCORE_FLOOR,
         redactions=_redactions_for(metric, role),
+        drop_sources=drop_sources,
         telemetry=Telemetry(
             stage_ms=watch.stage_ms,
             total_ms=watch.total_ms,
@@ -182,6 +189,7 @@ def run(
     window: Window | None = None,
     role: str | None = None,
     persona: "personas.Persona | None" = None,
+    drop_sources: frozenset[str] = frozenset(),
 ) -> DiagnosisCard:
     """Diagnose `metric` as of `as_of`.
 
@@ -196,7 +204,13 @@ def run(
     told. Role changes the numbers; persona never does.
     """
     payload = diagnose(
-        metric, as_of, store=store, cohort=cohort, window=window, role=role
+        metric,
+        as_of,
+        store=store,
+        cohort=cohort,
+        window=window,
+        role=role,
+        drop_sources=drop_sources,
     )
     if payload is None:
         return DiagnosisCard.no_anomaly(metric, as_of)

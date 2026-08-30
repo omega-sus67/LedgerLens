@@ -167,3 +167,26 @@ def test_telemetry_panel_states_the_zero_and_prices_the_alternative(truth):
     assert "$0.0000" in text
     assert config.MODEL in text, "the counterfactual must be priced, not waved at"
     assert "no query_id" in text, "the telemetry carve-out must be stated, not hidden"
+
+
+def test_the_source_drop_toggle_makes_abstention_reachable(truth):
+    """MPE row 5, demonstrated rather than described. Before this switch the
+    abstention branch could only be reached by editing source."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    assert "deploy_sepa_v214" in at.title[0].value, "baseline should name the cause"
+
+    at.sidebar.checkbox[0].set_value(True).run()
+    assert at.exception == []
+    assert "no connected change explains it" in at.title[0].value
+    text = " ".join(m.value for m in at.markdown) + " ".join(i.value for i in at.info)
+    assert "github" in text, "the card must name the source it is missing"
+
+
+def test_toggling_the_drop_back_off_restores_the_diagnosis(truth):
+    """The cache-key check for drop_sources, same shape as the role one."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    baseline = at.title[0].value
+    at.sidebar.checkbox[0].set_value(True).run()
+    assert at.title[0].value != baseline
+    at.sidebar.checkbox[0].set_value(False).run()
+    assert at.title[0].value == baseline, "stale payload served after toggling back"
