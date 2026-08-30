@@ -21,7 +21,7 @@ import pandas as pd
 import streamlit as st
 
 import config
-from ledgerlens import contracts, llm, narrate, personas, pipeline
+from ledgerlens import contracts, learning, llm, narrate, personas, pipeline
 from ledgerlens.models import DiagnosisCard, Window, cohort_label
 
 st.set_page_config(page_title="LedgerLens", page_icon="🔎", layout="wide")
@@ -36,6 +36,7 @@ def load_payload(
     role_key: str = "",
     drop_key: str = "",
     investigate: bool = False,
+    feedback_key: str = "",
 ):
     """Cached on everything that changes the PAYLOAD.
 
@@ -55,6 +56,12 @@ def load_payload(
     real queries and puts their results on the card. Note the asymmetry with persona --
     the investigator changes what is SHOWN but provably not what was RANKED, and it
     still belongs above the boundary because it costs money and latency to recompute.
+
+    `feedback_key` is the last one, and it is the one the docstring named first. It is
+    not read by `diagnose()` at all -- it is a CACHE BUSTER. An analyst verdict changes
+    the `verdict` table, which changes the learned prior, which changes the P component
+    of every score. Without it the loop looks broken: the row lands, the prior moves in
+    the database, and the UI keeps rendering the memoised payload from before it.
     """
     import json
     from datetime import date
@@ -195,8 +202,19 @@ if kpi.status == "sparse_history":
     cohort_key = json.dumps({"region": [region], "payment_rail": ["sepa"]}, sort_keys=True)
     window_key = json.dumps([w_start.isoformat(), w_end.isoformat()])
 
+# Bumped by every recorded verdict; see `load_payload`'s docstring for why a value
+# nothing reads still has to be in the cache key.
+st.session_state.setdefault("feedback_n", 0)
+
 store, payload = load_payload(
-    metric, as_of.isoformat(), cohort_key, window_key, who.role, drop_key, investigate
+    metric,
+    as_of.isoformat(),
+    cohort_key,
+    window_key,
+    who.role,
+    drop_key,
+    investigate,
+    str(st.session_state.feedback_n),
 )
 card = (
     narrate.narrate(payload, persona=who)
@@ -432,6 +450,40 @@ def render_hypothesis(h, rank: int | None, rejected: bool) -> None:
             col.caption(f"**{key}** {labels[key]} · w={config.SCORE_WEIGHTS[key]}")
             col.progress(min(max(value, 0.0), 1.0), text=f"{value:.2f}")
 
+        # ---- Task 5: the feedback loop that makes P a LEARNED number.
+        #
+        # Shown for every persona on purpose. A verdict is not a lever -- it is the
+        # reader answering "did this turn out to be right?", and the CFO who watched the
+        # forecast recover is as entitled to answer it as the analyst. `decision_rights`
+        # gates ACTIONS, and conflating the two would silence the people best placed to
+        # close the loop.
+        confirms, rejects, p_query = learning.counts(store, h.event.event_type, metric)
+        fb_text, fb_yes, fb_no = st.columns([4, 1, 1])
+        fb_text.caption(
+            f"**P = {h.scores.P:.2f}** — a Beta–Bernoulli posterior over "
+            f"**{confirms} confirmed** / **{rejects} rejected** past verdicts for "
+            f"`{h.event.event_type}` on `{metric}`"
+            + (f"  ·  `{p_query}`" if p_query else "")
+        )
+
+        def _verdict(kind: str) -> None:
+            learning.record(
+                store,
+                anomaly_id=h.anomaly_id,
+                hypothesis_id=h.hypothesis_id,
+                event_type=h.event.event_type,
+                metric=metric,
+                verdict=kind,
+            )
+            st.session_state.feedback_n += 1
+
+        if fb_yes.button("👍 Correct", key=f"ok_{h.hypothesis_id}", width="stretch"):
+            _verdict("confirm")
+            st.rerun()
+        if fb_no.button("👎 Wrong", key=f"no_{h.hypothesis_id}", width="stretch"):
+            _verdict("reject")
+            st.rerun()
+
         # Depth personalization: on-call and the analyst want every control; the CFO
         # and growth get the verdict without the check-by-check table.
         if h.controls and who.show_control_table:
@@ -483,6 +535,21 @@ for i, h in enumerate(card.ranked, 1):
     render_hypothesis(h, i, rejected=False)
 for h in card.rejected:
     render_hypothesis(h, None, rejected=True)
+
+if st.session_state.feedback_n:
+    recorded, _ = store.q(
+        "SELECT event_type, metric, verdict, count(*) AS n FROM verdict "
+        "GROUP BY event_type, metric, verdict ORDER BY event_type, verdict",
+        label="recorded verdicts",
+    )
+    st.success(
+        f"📝 **{int(recorded['n'].sum())} verdict(s) recorded this session.** Each one "
+        f"is a row in `verdict`, and the prior is re-counted from those rows on every "
+        f"diagnosis — there is no separate model state to drift, and deleting a row "
+        f"puts the prior back exactly where it was.",
+        icon="🔁",
+    )
+    st.dataframe(recorded, width="stretch", hide_index=True)
 
 st.divider()
 

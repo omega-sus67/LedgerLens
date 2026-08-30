@@ -115,6 +115,21 @@ class Store:
         self._q_cache[query_id] = (df, query_id)
         return df, query_id
 
+    def invalidate(self, label: str) -> int:
+        """Drop cached results for every query issued under `label`. Returns the count.
+
+        `q()` memoises on query_id and never expires, which is correct for this
+        workload: the fact table is immutable within a run. The `verdict` table is the
+        one exception -- an analyst writes to it from the UI -- so the learned prior
+        would keep returning the counts it saw before the verdict was recorded. This is
+        the targeted invalidation for that, rather than clearing the whole cache and
+        making the next diagnosis report every query as a cold execution.
+        """
+        rows = self.con.execute(
+            "SELECT query_id FROM query_log WHERE label = $l", {"l": label}
+        ).fetchall()
+        return sum(1 for (qid,) in rows if self._q_cache.pop(qid, None) is not None)
+
     def stats_snapshot(self) -> dict[str, int]:
         """A COPY, so a caller holding it across a diagnosis sees a delta rather than
         a live view that moves under them. Snapshot-and-subtract is also what lets a

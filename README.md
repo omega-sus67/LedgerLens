@@ -43,7 +43,7 @@ uv venv --python 3.12
 uv pip install --python .venv/bin/python duckdb pandas pyarrow numpy scipy statsmodels pydantic streamlit plotly httpx anthropic pytest
 
 .venv/bin/python -m ledgerlens.gen_data    # writes data/*.parquet, *.json, ground_truth.json
-.venv/bin/python -m pytest -q              # 293 tests
+.venv/bin/python -m pytest -q              # 307 tests
 .venv/bin/python -m ledgerlens.pipeline    # prints the diagnosis card to stdout
 .venv/bin/python -m streamlit run app.py   # the analyst UI
 ```
@@ -317,6 +317,36 @@ was refused. Full reasoning in
 
 ---
 
+## The feedback loop: a prior you can delete
+
+The fifth score component, **P**, is the only number an analyst can move. Each hypothesis
+card carries 👍 / 👎 controls; a verdict is one row in `verdict`, and the prior is a
+Beta–Bernoulli posterior **re-counted from those rows on every diagnosis**.
+
+There is no model state. Nothing is trained, nothing drifts, and **deleting a row puts
+the prior back exactly where it was** — `test_the_prior_is_derived_from_rows_not_kept_as_state`
+asserts precisely that. It is the cheapest possible learning mechanism that is still
+honest about what it learned and reversible when it learns wrong.
+
+Three properties make it safe to ship:
+
+- **It sharpens a ranking; it never decides one.** P is weighted `0.05`, so its entire
+  range moves a total by at most 0.05. A candidate ten points below `SCORE_FLOOR` cannot
+  be confirmed into confidence — there is a test that saturates the prior with 200
+  confirmations and checks the candidate *still* fails to clear the floor.
+- **It cannot rescue what a control killed.** A decisive control failure zeroes N
+  outright, and no amount of past agreement outvotes it.
+- **It is auditable like everything else.** The prior goes through `Store.q`, so P
+  carries a replayable `query_id` and the card states the evidence behind it — *"a
+  Beta–Bernoulli posterior over 3 confirmed / 1 rejected past verdicts."* Before this,
+  P was the one number on screen a reader could not open.
+
+Feedback is offered to **every persona**. A verdict is not a lever: `decision_rights`
+gates actions, and the CFO who watched the forecast recover is as entitled to answer
+*"did this turn out to be right?"* as the analyst.
+
+---
+
 ## LLM versus non-LLM, and what a diagnosis costs
 
 **Nothing on the ranking path calls a model.** Detection, attribution, candidate
@@ -444,7 +474,7 @@ ledgerlens/
   llm.py                      provider seam: gemini + anthropic adapters
   investigator.py             the LLM lane: proposed checks, unverified causes, guard
   pipeline.py                 orchestration
-tests/                        293 tests; test_pipeline.py is the acceptance test
+tests/                        307 tests; test_pipeline.py is the acceptance test
 docs/
   how_it_works.md             start here if the vocabulary is new
   ai_decisions.md             the LLM lane, end to end

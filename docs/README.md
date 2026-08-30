@@ -22,6 +22,7 @@ one before changing the code it covers.
 | [`telemetry_decisions.md`](telemetry_decisions.md) | latency, query accounting, and why "queries" is three numbers |
 | [`abstention_decisions.md`](abstention_decisions.md) | the reachable path to *"nothing connected explains this"* |
 | [`ai_decisions.md`](ai_decisions.md) | **the LLM investigator lane** — the provider seam, the validation gate, the numbers guard |
+| [`learning_decisions.md`](learning_decisions.md) | the analyst feedback loop — a Beta–Bernoulli prior you can delete |
 
 ## Background
 

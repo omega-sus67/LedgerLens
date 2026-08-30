@@ -354,3 +354,45 @@ def test_the_ranking_on_screen_is_unchanged_by_the_lane(truth, stub_llm):
     text = " ".join(m.value for m in at.markdown)
     assert "deploy_sepa_v214" in text, "the lane must not change which cause ranks first"
     assert "campaign_dach_cut" in text, "the decoy must still be shown as rejected"
+
+
+# ------------------------------------------------------------- the feedback loop
+
+
+def test_the_feedback_controls_are_offered_to_every_persona(truth):
+    """A verdict is not a lever. `decision_rights` gates actions; answering "did this
+    turn out to be right?" is something the CFO who watched the forecast recover is as
+    entitled to do as the analyst."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    labels = [b.label for b in at.button]
+    assert "👍 Correct" in labels and "👎 Wrong" in labels
+
+    at = at.sidebar.selectbox[1].select("cfo").run()
+    assert at.exception == []
+    assert "👍 Correct" in [b.label for b in at.button]
+
+
+def test_the_prior_is_shown_with_the_evidence_behind_it(truth):
+    """P is the one component an analyst can move, so the card states what moved it
+    rather than printing a bare number."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    text = " ".join(c.value for c in at.caption)
+    assert "Beta–Bernoulli posterior" in text
+    assert "confirmed" in text and "rejected" in text
+
+
+def test_recording_a_verdict_moves_the_prior_on_screen(truth, clean_verdicts):
+    """End to end through the UI: the button writes a row, the cache key changes, the
+    payload is recomputed, and the rendered P is different. Any one of those failing
+    leaves a loop that looks closed and is not."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    before = " ".join(c.value for c in at.caption)
+    assert "**0 confirmed**" in before
+
+    at = [b for b in at.button if b.label == "👍 Correct"][0].click().run()
+    assert at.exception == []
+    after = " ".join(c.value for c in at.caption)
+    assert "**1 confirmed**" in after, "the verdict did not reach the prior"
+    assert "verdict(s) recorded this session" in " ".join(m.value for m in at.markdown) + " ".join(
+        s.value for s in at.success
+    )

@@ -17,7 +17,7 @@ deliberately; don't let this file duplicate or drift from it.
 
 ## Current state (as of 2026-08-30)
 
-- Deterministic core is done and stable: **293 tests passing**, decoy-rejection demo
+- Deterministic core is done and stable: **307 tests passing**, decoy-rejection demo
   works end-to-end, README's claims verified against the code.
 - **Tasks 1, 2, 3, 4, 6 and 7 are done** (KPI semantic contract; personas + `Action`
   reshape; third KPI with sparse history; role-based entitlement; telemetry panel;
@@ -238,6 +238,32 @@ touching `llm.py`, `investigator.py`, `config.PROVIDERS` or the `investigate` fl
 - Test count **229 -> 293**. `test_investigator.py` (36) and `test_llm.py` (19) are new;
   8 added to `test_app.py`, including a check that the AI toggle does not displace the
   source-drop checkbox that two other tests address BY INDEX.
+
+## Done: task 5 -- the feedback loop (Round 2 Objective 7)
+
+`learning.record()` existed and nothing called it. Now the hypothesis cards carry
+confirm/reject controls and P is a genuinely learned number.
+**Full rationale in [docs/learning_decisions.md](docs/learning_decisions.md).**
+
+- **Fixed a real hole: P had no `query_id`.** `learning.prior` used a bare
+  `con.execute`, making the fifth score component the ONE number on screen a reader
+  could not open. It now goes through `Store.q` and rides in `Hypothesis.query_ids`.
+  This was an oversight, NOT a third exception to the two-exceptions rule.
+- **`record()` MUST invalidate the cached count.** `q()` memoises forever and `verdict`
+  is the only table the UI writes to. Without `Store.invalidate(PRIOR_LABEL)` the row
+  lands, the prior moves in the DB, and the UI renders the stale count -- a bug that
+  looks exactly like "feedback does nothing". Targeted by label, never a blanket
+  `_q_cache.clear()`, which would corrupt the telemetry panel's cold/warm counts.
+- **`feedback_key` is a CACHE BUSTER; `diagnose()` never reads it.** Documented in the
+  docstring so a later reader does not delete it as dead.
+- **The suite must start from an uninformed prior.** The session `store` fixture now
+  truncates `verdict`, and `clean_verdicts` restores it after tests that write one.
+  A single stray verdict moves the acceptance test's 0.700 by 0.008 against its 0.01
+  tolerance -- a flake that only fires on the NEXT run.
+- **Never raise P's weight above 0.05.** At 0.05 a saturated prior cannot lift a
+  candidate over `SCORE_FLOOR` and cannot rescue one a control killed; both are tested.
+  That bound is what makes the loop safe to expose to users.
+- Test count **293 -> 307**. `tests/test_learning.py` (11) plus 3 in `test_app.py`.
 
 ## Conventions this repo uses (learned, not to be reinvented)
 

@@ -161,13 +161,14 @@ def score(
     ctrls = controls_mod.generate(store, a, ev)
     n_score, rejection = controls_mod.score_n(ctrls)
     c_score, c_queries = cohort_match(store, a, ev)
+    p_score, p_query = learning.prior(store, ev.event_type, a.metric)
 
     scores = ComponentScores(
         T=round(temporal(a, ev), 6),
         C=round(c_score, 6),
         D=round(dose_response(store, a, ev), 6),
         N=round(n_score, 6),
-        P=round(learning.prior(store, ev.event_type, a.metric), 6),
+        P=round(p_score, 6),
     )
     # LLM-extracted events carry their extraction confidence into the ranking, and
     # the UI badges them "inferred -- verify". Deterministic events are unaffected.
@@ -182,7 +183,12 @@ def score(
         controls=ctrls,
         symptoms=attach_symptoms(ev, a, symptoms),
         rejection_reason=rejection,
-        query_ids=[a.query_id, *c_queries, *[c.query_id for c in ctrls]],
+        # p_query is last and may be empty (no store -> no prior query). Filtered
+        # here rather than by the consumer, so nothing downstream has to know that the
+        # prior is the one component that can be computed without a query.
+        query_ids=[
+            q for q in [a.query_id, *c_queries, *[c.query_id for c in ctrls], p_query] if q
+        ],
     )
 
 
