@@ -284,6 +284,34 @@ class Redaction(BaseModel):
     reason: str
 
 
+class Telemetry(BaseModel):
+    """What this diagnosis cost to produce.
+
+    The SECOND deliberate exception to "every number carries a query_id" -- Redaction
+    was the first. Latency is a fact about the PROCESS, not about the data, and there
+    is no query behind it to replay. The UI states that outright rather than leaving a
+    reader to notice a missing id.
+
+    Three query counts, because "queries" is three different numbers and conflating
+    them flatters us by roughly 6x (19 ids on a card against ~86 registered queries
+    executed cold). `queries_on_card` answers "how much of this can I audit";
+    `queries_executed` answers "what did this cost". Metadata lookups (dim_universe,
+    events, max_date) are counted in NEITHER -- they carry no user-facing number and
+    therefore no query_id, and putting unauditable work into a field a reader assumes
+    is auditable would recreate the exact confusion this split exists to prevent.
+    """
+
+    model_config = ConfigDict(frozen=True)
+    stage_ms: dict[str, float]
+    total_ms: float
+    queries_executed: int
+    queries_cached: int
+    queries_on_card: int = 0
+    llm_calls: int = 0
+    llm_tokens: int = 0
+    llm_cost_usd: float = 0.0
+
+
 class Action(BaseModel):
     """The brief's recommendation chain, in the brief's order:
 
@@ -333,6 +361,9 @@ class DiagnosisCard(BaseModel):
     # What policy withheld from this reader. Defaulted, so every existing
     # construction site stays valid and an unrestricted card is simply empty.
     redactions: list[Redaction] = []
+    # Defaulted to None: DiagnosisCard.no_anomaly() has no pipeline behind it and
+    # legitimately has nothing to account for.
+    telemetry: Telemetry | None = None
 
     @staticmethod
     def no_anomaly(metric: str, as_of: date) -> "DiagnosisCard":

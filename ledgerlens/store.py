@@ -59,6 +59,12 @@ class Store:
         # unhashable, and the naive attempt is a 20-minute detour (spec 16 #7).
         self._q_cache: dict[str, tuple[pd.DataFrame, str]] = {}
         self._series_cache: dict[tuple, tuple[pd.Series, str]] = {}
+        # Per-instance counters for the telemetry panel. `q` is the only REGISTERED
+        # path to the database, so this is the complete picture of auditable work --
+        # and deliberately does NOT count dim_universe/events/max_date, which carry no
+        # user-facing number. Only `q` knows which calls were cache hits, which is why
+        # the counter lives here rather than in pipeline.
+        self.stats: dict[str, int] = {"issued": 0, "executed": 0, "cached": 0}
 
     # ------------------------------------------------------------------ schema
 
@@ -85,8 +91,11 @@ class Store:
         params = params or {}
         payload = sql + json.dumps(params, sort_keys=True, default=str)
         query_id = "q_" + hashlib.sha1(payload.encode()).hexdigest()[:10]
+        self.stats["issued"] += 1
         if query_id in self._q_cache:
+            self.stats["cached"] += 1
             return self._q_cache[query_id]
+        self.stats["executed"] += 1
 
         df = self.con.execute(sql, params).df()
         preview = self._preview(df)
@@ -105,6 +114,13 @@ class Store:
         )
         self._q_cache[query_id] = (df, query_id)
         return df, query_id
+
+    def stats_snapshot(self) -> dict[str, int]:
+        """A COPY, so a caller holding it across a diagnosis sees a delta rather than
+        a live view that moves under them. Snapshot-and-subtract is also what lets a
+        long-lived Store (which is what Streamlit has) report per-diagnosis numbers
+        instead of since-boot totals."""
+        return dict(self.stats)
 
     @staticmethod
     def _preview(df: pd.DataFrame) -> str:
