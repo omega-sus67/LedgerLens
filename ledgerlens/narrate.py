@@ -425,6 +425,34 @@ def _actions(payload: NarrationPayload, who: personas.Persona) -> list[Action]:
     return actions
 
 
+def _redaction_sentence(payload: NarrationPayload) -> str:
+    """One sentence per policy, built from the AccessRule's own strings.
+
+    Deliberately does NOT count the hidden slices. Producing that count means running
+    the unrestricted drill -- i.e. computing the very answer this reader is not
+    entitled to, in the process that renders their page. A redaction notice that must
+    first compute the secret is not a redaction. The dimension, the policy id and the
+    reason are enough to make the refusal attributable, and they are free.
+    """
+    if not payload.redactions:
+        return ""
+    by_policy: dict[str, list[str]] = {}
+    reasons: dict[str, str] = {}
+    for r in payload.redactions:
+        by_policy.setdefault(r.policy_id, []).append(r.dim)
+        reasons[r.policy_id] = r.reason
+    out = []
+    for policy_id, dims in by_policy.items():
+        cuts = ", ".join(f"`{d}`" for d in sorted(set(dims)))
+        out.append(
+            f" Deeper cuts by {cuts} are redacted from this view by policy "
+            f"`{policy_id}`: {reasons[policy_id].rstrip('.')}. The figures above are "
+            f"the most specific slice you are entitled to, not the most specific "
+            f"slice that exists."
+        )
+    return "".join(out)
+
+
 def _cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCard:
     top = payload.ranked[0]
     focal, root = payload.focal, payload.root
@@ -523,6 +551,7 @@ def _cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCa
         )
 
     headline, summary = _prose(payload, who, unexplained, cohort)
+    summary = summary + _redaction_sentence(payload)
 
     actions = _for_persona(_actions(payload, who), who)
 
@@ -544,6 +573,7 @@ def _cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCa
         seasonal_pct=payload.seasonal_pct,
         seasonal_query_id=payload.seasonal_query_id,
         no_confident_cause=False,
+        redactions=payload.redactions,
     )
 
 
@@ -566,6 +596,7 @@ def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> Diagnosi
             f"{best} No recorded change whose blast radius touches this cohort clears the "
             f"confidence floor. Connected sources: {connected}. Not connected: {missing}. "
             f"The cause may well sit in one of those."
+            + _redaction_sentence(payload)
         ),
         causal_chain=[
             EvidenceStep(
@@ -607,4 +638,5 @@ def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> Diagnosi
         seasonal_pct=payload.seasonal_pct,
         seasonal_query_id=payload.seasonal_query_id,
         no_confident_cause=True,
+        redactions=payload.redactions,
     )

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 
 import config
-from ledgerlens import anomaly, contracts, hypothesis, narrate
+from ledgerlens import anomaly, contracts, hypothesis, narrate, personas
 from ledgerlens.ledger import symptoms as symptoms_mod
 from ledgerlens.models import Anomaly, Cohort, DiagnosisCard, Redaction, Window
 from ledgerlens.store import Store
@@ -136,6 +136,8 @@ def run(
     store: Store | None = None,
     cohort: Cohort | None = None,
     window: Window | None = None,
+    role: str | None = None,
+    persona: "personas.Persona | None" = None,
 ) -> DiagnosisCard:
     """Diagnose `metric` as of `as_of`.
 
@@ -144,11 +146,17 @@ def run(
     offsetting moves that cancel at the root) becomes "we don't auto-surface this"
     rather than "we can't diagnose this", because the downstream chain does not care
     where the focal anomaly came from.
+
+    `role` and `persona` are the two halves of "who is reading this", and they are
+    NOT the same thing: role decides what may be computed, persona decides how it is
+    told. Role changes the numbers; persona never does.
     """
-    payload = diagnose(metric, as_of, store=store, cohort=cohort, window=window)
+    payload = diagnose(
+        metric, as_of, store=store, cohort=cohort, window=window, role=role
+    )
     if payload is None:
         return DiagnosisCard.no_anomaly(metric, as_of)
-    return narrate.narrate(payload)
+    return narrate.narrate(payload, persona=persona)
 
 
 def card_query_ids(card: DiagnosisCard) -> list[str]:
