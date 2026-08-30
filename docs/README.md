@@ -7,6 +7,10 @@ here assumes it.
 The [root `README.md`](../README.md) is the canonical description of what the system
 does and the honest scope of its claims.
 
+This file is a **topical index** — what each document covers. Its sequential
+counterpart is [`study_guide.md`](../study_guide.md) at the repo root, which puts
+everything below in reading order with checkpoints along the way.
+
 ## Decision records
 
 One per subsystem. Each says what was built, what was deliberately *not* built, and the
