@@ -40,7 +40,7 @@ Three further things stated plainly:
 
 ```bash
 uv venv --python 3.12
-uv pip install --python .venv/bin/python duckdb pandas pyarrow numpy scipy statsmodels pydantic streamlit plotly httpx anthropic pytest
+uv pip install --python .venv/bin/python -r requirements.txt
 
 .venv/bin/python -m ledgerlens.gen_data    # writes data/*.parquet, *.json, ground_truth.json
 .venv/bin/python -m pytest -q              # 307 tests
@@ -379,24 +379,24 @@ The ⏱ **Telemetry** panel puts the accounting on the page:
 
 | stage | ms | share |
 |---|---:|---:|
-| **drill** | 757.5 | **62%** |
-| rank | 363.9 | 30% |
-| detect | 70.9 | 6% |
-| seasonal | 15.2 | 1% |
-| symptoms | 14.5 | 1% |
-| narrate | 0.4 | 0% |
-| **total** | **1,222 ms** | |
+| **drill** | 799.0 | **62%** |
+| rank | 390.1 | 30% |
+| detect | 71.6 | 6% |
+| seasonal | 16.8 | 1% |
+| symptoms | 15.4 | 1% |
+| narrate | 0.9 | 0% |
+| **total** | **1,293 ms** | |
 
 | | count |
 |---|---:|
-| registered queries executed | **86** |
-| …served from cache | 39 |
-| **distinct `query_id`s replayable on the card** | **19** |
+| registered queries executed | **89** |
+| …served from cache | 41 |
+| **distinct `query_id`s replayable on the card** | **22** |
 | **LLM calls / tokens / cost** | **0 / 0 / $0.0000** |
 
-Two of those numbers deserve their distinction. **86** is what the diagnosis cost to
-produce; **19** is how much of it a reader can audit. Reporting the smaller one as
-"queries" would understate the work by roughly 6×, in the one panel whose whole job is
+Two of those numbers deserve their distinction. **89** is what the diagnosis cost to
+produce; **22** is how much of it a reader can audit. Reporting the smaller one as
+"queries" would understate the work by roughly 4×, in the one panel whose whole job is
 honest cost accounting — so both are shown, under names that cannot be confused.
 Metadata lookups (`dim_universe`, `events`) are counted in neither: they carry no
 user-facing number and therefore no `query_id`.

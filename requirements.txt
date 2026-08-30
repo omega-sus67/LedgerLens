@@ -1,0 +1,27 @@
+# The exact versions this build was developed and tested against -- 307 passing tests
+# on Python 3.12. Pinned rather than ranged on purpose: the acceptance tests assert
+# exact numbers downstream of numpy/scipy/statsmodels, and a solver or RNG change in a
+# minor release is the kind of thing that turns a green suite amber on a judge's laptop.
+#
+#   uv venv --python 3.12
+#   uv pip install --python .venv/bin/python -r requirements.txt
+#
+# httpx is a DIRECT dependency: it is the transport for the Gemini provider in
+# ledgerlens/llm.py. `google-genai` is deliberately not here -- see docs/ai_decisions.md
+# D3 for why the Gemini adapter is hand-rolled REST rather than an SDK.
+#
+# anthropic is optional at runtime. It is only imported inside AnthropicProvider, so
+# dropping it costs you the second provider and nothing else.
+
+duckdb==1.5.5
+pandas==3.0.5
+pyarrow==25.0.1
+numpy==2.5.2
+scipy==1.18.0
+statsmodels==0.14.6
+pydantic==2.13.4
+streamlit==1.59.1
+plotly==6.9.0
+httpx==0.28.1
+anthropic==0.122.0
+pytest==9.1.1

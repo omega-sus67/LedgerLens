@@ -145,9 +145,11 @@ before touching `AccessRule`, `pipeline._visible_dims`, or the cache key.
 Closes MPE rows 9 and 10, which takes the checklist to ten of ten.
 **Full rationale in [docs/telemetry_decisions.md](docs/telemetry_decisions.md).**
 
-- **"Queries" is THREE numbers, and merging them understates the work ~6x.**
-  `queries_executed` (86 cold) is what the diagnosis cost; `queries_on_card` (19) is
-  what a reader can audit; `queries_cached` (39) is work avoided. **Never add a field
+- **"Queries" is THREE numbers, and merging them understates the work ~4x.**
+  `queries_executed` (89 cold) is what the diagnosis cost; `queries_on_card` (22) is
+  what a reader can audit; `queries_cached` (41) is work avoided. (These counts moved
+  with task 8's AI checks and task 5's prior query; the RATIO is the durable point,
+  the absolutes are not asserted anywhere and should not be.) **Never add a field
   called `queries`.** Metadata lookups (`dim_universe`, `events`) are counted in none of
   them -- no user-facing number, so no `query_id`.
 - **The counter lives on `Store`**, because only `q()` knows what was a cache hit.

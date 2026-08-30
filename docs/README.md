@@ -24,6 +24,13 @@ one before changing the code it covers.
 | [`ai_decisions.md`](ai_decisions.md) | **the LLM investigator lane** — the provider seam, the validation gate, the numbers guard |
 | [`learning_decisions.md`](learning_decisions.md) | the analyst feedback loop — a Beta–Bernoulli prior you can delete |
 
+## Submission (Round 2)
+
+- [`business_proposal.md`](business_proposal.md) — the detailed business proposal:
+  problem framing, solution design, target users, business case, roadmap, risks.
+- [`demo_script.md`](demo_script.md) — shot-by-shot script for the prototype video.
+- Rendered PDFs live in [`../submission/`](../submission/).
+
 ## Background
 
 - [`design/IMPLEMENTATION_SPEC.md`](design/IMPLEMENTATION_SPEC.md) — the build contract

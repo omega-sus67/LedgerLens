@@ -144,9 +144,9 @@ def test_queries_on_card_matches_the_provenance_audit(store):
 
 
 def test_the_provenance_count_is_smaller_than_the_work_done():
-    """The correction that motivated this whole design: ~19 ids on the card against
-    ~86 registered queries executed cold. Reporting the former as 'queries' in a
-    runtime panel understates the work by roughly 6x. Both numbers are real; they
+    """The correction that motivated this whole design: ~22 ids on the card against
+    ~89 registered queries executed cold. Reporting the former as 'queries' in a
+    runtime panel understates the work by roughly 4x. Both numbers are real; they
     answer different questions and must never be merged into one field.
 
     Opens its own store so the cache is genuinely cold -- the shared fixture is warm.
