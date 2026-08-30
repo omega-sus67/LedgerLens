@@ -1,6 +1,6 @@
 # Demo Video — Narration Script
 
-**Timed against the actual recording:** `LedgerLens_demo.mp4`, **5:50**, 1600×1000, silent
+**Timed against the actual recording:** `LedgerLens_demo.mp4`, **6:03**, 1600×1000, silent
 screen capture. Every timestamp below was read off that file frame by frame, not planned —
 so you can narrate straight over it without touching the picture.
 
@@ -10,9 +10,13 @@ rather than pressure.
 
 **The video points for you.** A screen recording has no cursor, so the page highlights its
 own targets: at the moment listed under each beat, a red ring appears around the thing being
-discussed and the rest of the page dims. You never have to say "over here on the left" —
-just talk, and the ring will be there. Every timestamp below was measured by the recorder
-itself, not estimated from frames.
+discussed and the rest of the page dims. Just talk — the ring will be there.
+
+Every time below was **measured twice**: stamped by the recorder as it drew each ring, then
+re-checked against the finished MP4 by detecting the ring in the actual frame. All twelve
+verified. One limitation worth knowing: Streamlit draws table *rows* to a canvas, so a single
+row can never be ringed — beats 2 and 3 ring the table and the card instead, and the prose
+tells the viewer which row to look at.
 
 Figures are guarded by [`tests/test_demo_script.py`](../tests/test_demo_script.py) against a
 live diagnosis. **If the app and this script disagree, the suite goes red before you record.**
@@ -55,7 +59,7 @@ deciding (2:02)**, and **the refusal (4:20)**.
 ## Beat 2 — Decomposed, then drilled (0:30–1:01) · ~80 words
 
 **On screen:** the Attribution table.
-**The video highlights it for you:** **0:44** — the `◀ focal` row
+**The video highlights it for you:** **0:44** — the whole Attribution table (its rows are canvas-drawn, so the `◀ focal` row itself can't be ringed — say "the bottom row")
 
 > "Renewals are down eight point three percent. Some of that's just August — it's always
 > slower. We measured that from the same customers a year ago, so it's not a guess. Take it
@@ -73,7 +77,7 @@ deciding (2:02)**, and **the refusal (4:20)**.
 
 **The forty seconds that win this. Slow down.**
 **On screen:** the rejected card and its five-rule control table.
-**The video highlights it for you:** **1:14** — the red REJECTED banner · **1:28** — the pink `R2 segment-siblings` row
+**The video highlights it for you:** **1:14** — the red REJECTED banner · **1:27** — the struck-through `campaign_dach_cut`, directly above its control table
 
 > "Now the interesting part. Marketing cut their German ad budget one day before renewals
 > fell. One day. That looks guilty — and most tools would blame it.
@@ -95,7 +99,7 @@ deciding (2:02)**, and **the refusal (4:20)**.
 ## Beat 4 — Innocent here, guilty there (1:44–2:04) · ~54 words
 
 **On screen:** the evidence chain, then Recommended actions.
-**The video highlights it for you:** **1:51** — the `[P2]` action's `new_logo_bookings -31.0%` basis
+**The video highlights it for you:** **1:50** — the `[P2]` action's `new_logo_bookings -31.0%` basis
 
 > "And here's where it gets useful.
 >
@@ -130,7 +134,7 @@ deciding (2:02)**, and **the refusal (4:20)**.
 ## Beat 6 — Two guards, not one ★ (2:39–3:03) · ~67 words
 
 **On screen:** the unverifiable-causes panel, then back to the headline.
-**The video highlights it for you:** **2:39** — the green numbers-guard banner, immediately
+**The video highlights it for you:** **2:40** — the green numbers-guard banner (holds to 2:50)
 
 > "It also lists things that might be the cause but we can't check — and names the system
 > you'd need to find out.
@@ -163,7 +167,7 @@ deciding (2:02)**, and **the refusal (4:20)**.
 ## Beat 8 — Redaction that names itself (3:28–3:56) · ~74 words
 
 **On screen:** Growth Marketing — the 🔒 banner, and changed numbers.
-**The video highlights it for you:** **3:39** — the 🔒 *Restricted view* banner
+**The video highlights it for you:** **3:38** — the 🔒 *Restricted view* banner
 
 > "Marketing sees a different version — and not because we softened it. They're not allowed
 > to see payment data, so the tool genuinely can't split the numbers that way for them.
@@ -180,7 +184,7 @@ deciding (2:02)**, and **the refusal (4:20)**.
 ## Beat 9 — It declines to detect (3:57–4:25) · ~77 words
 
 **On screen:** `payment_success_rate` — the banner sits **above** the title.
-**The video highlights it for you:** **4:07** — the *Insufficient history* banner
+**The video highlights it for you:** **4:06** — the *Insufficient history* banner
 
 > "Third metric, awkward on purpose. It launched in June — under two months of
 > history. Not enough to know what normal looks like. So it refuses to guess, and says why.
@@ -195,10 +199,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > contract, not a constant in the engine. No seasonality is claimed: this KPI has no prior
 > August.
 
-## Beat 10 — When it doesn't know, it says so ★ (4:26–4:56) · ~84 words
+## Beat 10 — When it doesn't know, it says so ★ (4:26–4:57) · ~84 words
 
 **On screen:** abstention headline (4:20–4:37), then the diagnosis text (4:38–4:51).
-**The video highlights it for you:** **4:32** — the refusal headline (source list from 4:43)
+**The video highlights it for you:** **4:33** — the refusal headline (source list from 4:43)
 
 > "Last one, and it's my favourite. Pretend we never connected the system that tracks code
 > releases.
@@ -214,10 +218,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > **Technique —** Deterministic set logic, applied at candidate generation. Filtering later
 > would model *"we saw it and dismissed it"* — a different and less honest scenario.
 
-## Beat 11 — A prior you can delete (4:57–5:14) · ~45 words
+## Beat 11 — A prior you can delete (4:58–5:14) · ~45 words
 
 **On screen:** the top hypothesis after a 👍.
-**The video highlights it for you:** **4:57** — the score, reading `0.708`
+**The video highlights it for you:** **4:58** — the score, reading `0.708`
 
 > "An analyst confirms it — watch the score tick up.
 >
@@ -228,10 +232,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > **Technique —** Statistics — Beta–Bernoulli, derived from rows rather than kept as state.
 > That `0.008` shift is the entire influence this loop is permitted.
 
-## Beat 12 — The split, precisely (5:15–5:50) · ~102 words
+## Beat 12 — The split, precisely (5:15–6:03) · ~102 words
 
 **On screen:** ⏱ Telemetry — four tiles, the stage table, the *LLM vs non-LLM* paragraph.
-**The video highlights it for you:** **5:27** — *Replayable on this card: 22*
+**The video highlights it for you:** **5:28** — *Replayable on this card: 22*
 *Read the counts off the screen; they move as features land.*
 
 > "So here's the honest accounting — on the page, not in a slide.
