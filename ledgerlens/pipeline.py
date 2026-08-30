@@ -7,12 +7,13 @@ the only branch is "did anything clear the score floor".
 
 from __future__ import annotations
 
+import time
 from datetime import date
 
 import config
 from ledgerlens import anomaly, contracts, hypothesis, narrate, personas
 from ledgerlens.ledger import symptoms as symptoms_mod
-from ledgerlens.models import Anomaly, Cohort, DiagnosisCard, Redaction, Window
+from ledgerlens.models import Anomaly, Cohort, DiagnosisCard, Redaction, Telemetry, Window
 from ledgerlens.store import Store
 
 DEFAULT_AS_OF = date(2026, 8, 17)
@@ -26,6 +27,33 @@ def get_store(path=None) -> Store:
     if n == 0:
         store.load_all(config.DATA_DIR)
     return store
+
+
+class _Stopwatch:
+    """Stage timings for one diagnosis.
+
+    A small class rather than perf_counter pairs scattered through diagnose(), so the
+    stage names live in one place and a branch that SKIPS a stage simply never records
+    it. Padding the dict with 0.0 for a stage that never ran would read as "instant"
+    rather than "not applicable" -- see docs/telemetry_decisions.md D4.
+    """
+
+    def __init__(self) -> None:
+        self.stage_ms: dict[str, float] = {}
+        self._t0 = time.perf_counter()
+
+    def time(self, stage: str, fn):
+        """try/finally, not try/except: the timing is recorded even when the stage
+        raises, and the exception still propagates. Do not convert this to except."""
+        start = time.perf_counter()
+        try:
+            return fn()
+        finally:
+            self.stage_ms[stage] = (time.perf_counter() - start) * 1000
+
+    @property
+    def total_ms(self) -> float:
+        return (time.perf_counter() - self._t0) * 1000
 
 
 def _contract_for_engine(metric: str) -> contracts.KpiContract | None:
@@ -91,9 +119,13 @@ def diagnose(
     boundary, and `app.py`'s cache key must include it.
     """
     store = store or get_store()
+    watch = _Stopwatch()
+    stats_before = store.stats_snapshot()
 
     if cohort is not None and window is not None:
-        ev, query_id = anomaly.measure(store, metric, cohort, window)
+        ev, query_id = watch.time(
+            "measure", lambda: anomaly.measure(store, metric, cohort, window)
+        )
         if ev is None:
             return None
         root = anomaly._anomaly_from_eval(
@@ -101,19 +133,25 @@ def diagnose(
         )
         nodes = [root]
     else:
-        root = anomaly.detect(store, metric, as_of)
+        root = watch.time("detect", lambda: anomaly.detect(store, metric, as_of))
         if root is None:
             return None
-        nodes = anomaly.drill(store, root, _visible_dims(metric, role))
+        nodes = watch.time(
+            "drill", lambda: anomaly.drill(store, root, _visible_dims(metric, role))
+        )
 
     focal = anomaly.focal(nodes)
-    symptoms = symptoms_mod.cluster(store, focal.window)
-    hyps = hypothesis.rank(store, focal, symptoms)
+    symptoms = watch.time("symptoms", lambda: symptoms_mod.cluster(store, focal.window))
+    hyps = watch.time("rank", lambda: hypothesis.rank(store, focal, symptoms))
 
     ranked = [h for h in hyps if h.rejection_reason is None]
     rejected = [h for h in hyps if h.rejection_reason is not None]
 
-    seasonal_pct, seasonal_query_id = anomaly.seasonal_estimate(store, metric, root.cohort)
+    seasonal_pct, seasonal_query_id = watch.time(
+        "seasonal", lambda: anomaly.seasonal_estimate(store, metric, root.cohort)
+    )
+
+    stats_after = store.stats_snapshot()
 
     return narrate.NarrationPayload(
         metric=metric,
@@ -127,6 +165,12 @@ def diagnose(
         seasonal_query_id=seasonal_query_id,
         no_confident_cause=not ranked or ranked[0].total < config.SCORE_FLOOR,
         redactions=_redactions_for(metric, role),
+        telemetry=Telemetry(
+            stage_ms=watch.stage_ms,
+            total_ms=watch.total_ms,
+            queries_executed=stats_after["executed"] - stats_before["executed"],
+            queries_cached=stats_after["cached"] - stats_before["cached"],
+        ),
     )
 
 

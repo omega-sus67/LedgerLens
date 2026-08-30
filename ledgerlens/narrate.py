@@ -24,6 +24,7 @@ from ledgerlens.models import (
     Hypothesis,
     Redaction,
     SymptomCluster,
+    Telemetry,
     cohort_label,
 )
 
@@ -82,6 +83,9 @@ class NarrationPayload:
     # ordering. Carried, never recomputed -- narration states the refusal, it does
     # not decide it.
     redactions: list[Redaction] = field(default_factory=list)
+    # What this diagnosis cost. Carried, never recomputed -- narration reports the
+    # measurement, it does not take it (except its own stage, which only it can time).
+    telemetry: Telemetry | None = None
 
 
 def _money(x: float) -> str:

@@ -67,3 +67,53 @@ def test_stats_snapshot_is_a_copy_not_a_live_view(tmp_path):
     s.q("SELECT 2 AS b")
     assert before["issued"] == 0, "snapshot moved under the caller"
     s.close()
+
+
+# --------------------------------------------------------- 6.2 stages in diagnose
+
+
+def test_telemetry_reports_every_stage_of_the_detection_path(store):
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    t = payload.telemetry
+    assert set(t.stage_ms) == DETECT_STAGES
+    assert all(v >= 0 for v in t.stage_ms.values())
+
+
+def test_total_is_at_least_the_sum_of_its_stages(store):
+    """Structure, not a bound: total covers focal selection and payload construction
+    too. The 0.9 slack absorbs perf_counter granularity, nothing more."""
+    t = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store).telemetry
+    assert t.total_ms >= sum(t.stage_ms.values()) * 0.9
+
+
+def test_the_manual_window_path_reports_the_stages_it_actually_ran(store):
+    """The sparse-history path skips detection and drill entirely. A hardcoded
+    five-stage assertion would fail here -- and padding the dict with 0.0 for stages
+    that never ran would read as 'instant' rather than 'skipped'."""
+    payload = pipeline.diagnose(
+        "mrr_renewals",
+        pipeline.DEFAULT_AS_OF,
+        store=store,
+        cohort={"region": ["DACH"], "payment_rail": ["sepa"]},
+        window=Window(start=date(2026, 8, 4), end=date(2026, 8, 17)),
+    )
+    assert payload is not None
+    assert set(payload.telemetry.stage_ms) == MANUAL_STAGES
+
+
+def test_query_counts_are_internally_consistent(store):
+    """Absolute values are NOT asserted: the session-scoped store fixture is warm in
+    an order-dependent way, so executed-vs-cached varies by test order."""
+    t = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store).telemetry
+    assert t.queries_executed >= 0 and t.queries_cached >= 0
+    assert t.queries_executed + t.queries_cached > 0
+
+
+def test_telemetry_is_per_diagnosis_not_since_boot(store):
+    """Snapshot-and-subtract. A long-lived Store (which is what Streamlit has) must
+    report this diagnosis, not every diagnosis it has ever served."""
+    a = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store).telemetry
+    b = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store).telemetry
+    total_a = a.queries_executed + a.queries_cached
+    total_b = b.queries_executed + b.queries_cached
+    assert total_a == total_b, "counts accumulated instead of resetting per call"
