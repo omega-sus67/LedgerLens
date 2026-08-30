@@ -25,8 +25,11 @@ deliberately; don't let this file duplicate or drift from it.
   Rationale for each lives in `docs/contracts_decisions.md`,
   `docs/persona_decisions.md`, `docs/sparse_kpi_decisions.md`,
   `docs/roles_decisions.md`, `docs/telemetry_decisions.md` and
-  `docs/abstention_decisions.md`. 1-3 are merged to `main`; **4, 6 and 7 are stacked
-  and unmerged**: `task-4-entitlement` -> `task-6-telemetry` -> `task-7-abstention`.
+  `docs/abstention_decisions.md`, `docs/ai_decisions.md`. **Tasks 1-8 are all merged
+  to `main` and pushed.** The stack
+  `task-4-entitlement` -> `task-6-telemetry` -> `task-7-abstention` ->
+  `task-8-investigator` was fast-forwarded in on 2026-08-30; the branches are kept as
+  history and are pushed too.
 - **ALL TEN Minimum Prototype Expectation rows close.** Task 6 closed the last two
   (row 9, LLM vs non-LLM breakdown; row 10, runtime telemetry); task 7 hardened row 5
   by making abstention reachable from the UI. **Only task 12 (submission package)
@@ -43,8 +46,11 @@ deliberately; don't let this file duplicate or drift from it.
   and are named in the file with the reason. **Task 8 was un-cut and built**: the
   challenge is an AI challenge and the repo had no LLM in it. Seven of the ten Minimum Prototype
   Expectations already close; tasks 4 and 6 close the remaining three rows.
-- **Everything through task 3 is pushed to `origin/main`.** The stacked branches
-  `task-2-personas` and `task-3-sparse-kpi` were fast-forwarded into `main`.
+- **Everything through task 8 is pushed to `origin/main`.** Every stacked branch has
+  been fast-forwarded in -- the history is linear and no merge commit exists in this
+  repo. Fast-forward is the convention here: if a branch will not `--ff-only`, rebase
+  it rather than merging, or the next reader loses the ability to read history as a
+  single sequence of decisions.
 - **`tests/test_docs.py` guards the README's own claims.** The test count in
   `README.md`, the completeness of every `config.PROVIDERS` row, and the README's
   naming of the default model and its API-key env var are assertions, not prose.
@@ -280,7 +286,8 @@ touching `llm.py`, `investigator.py`, `config.PROVIDERS` or the `investigate` fl
 ## Deadline context
 
 Submission: **2026-08-30**. The schedule is `taskflow/taskflow.md`'s task order. Tasks
-1-4, 6 and 7 are done (4, 6, 7 unmerged and stacked). **All ten checklist rows close.**
+1-4 and 6-8 are done and merged. **All ten checklist rows close**, and task 8 added the
+LLM lane the challenge is named for.
 Task 12
 (submission package) is a *deliverable*, not a feature -- never cut it. Cut line if
 behind: drop task 5 (learning loop), then the P2 items inside 12. Tasks 8-11 are already
