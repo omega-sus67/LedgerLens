@@ -10,9 +10,9 @@ from __future__ import annotations
 from datetime import date
 
 import config
-from ledgerlens import anomaly, hypothesis, narrate
+from ledgerlens import anomaly, contracts, hypothesis, narrate
 from ledgerlens.ledger import symptoms as symptoms_mod
-from ledgerlens.models import Anomaly, Cohort, DiagnosisCard, Window
+from ledgerlens.models import Anomaly, Cohort, DiagnosisCard, Redaction, Window
 from ledgerlens.store import Store
 
 DEFAULT_AS_OF = date(2026, 8, 17)
@@ -28,12 +28,54 @@ def get_store(path=None) -> Store:
     return store
 
 
+def _contract_for_engine(metric: str) -> contracts.KpiContract | None:
+    """LENIENT lookup, matching `contracts.thresholds`.
+
+    The UI refuses to render an ungoverned KPI (`contracts.get` raises); the engine
+    must degrade to global defaults rather than crash. Detection is not the place a
+    governance gap should surface, so the strict lookup does not belong on this path.
+    """
+    return contracts.CONTRACTS.get(metric)
+
+
+def _visible_dims(metric: str, role: str | None) -> list[str]:
+    """The dimensions this role may drill into.
+
+    Entitlement is enforced HERE and nowhere else -- one chokepoint, so there is no
+    second place for the policy to be forgotten. `role=None` means unrestricted and
+    returns the global list unchanged, which is what keeps every existing call site
+    byte-identical.
+    """
+    contract = _contract_for_engine(metric)
+    if role is None or contract is None:
+        return config.DRILL_DIMS
+    return contract.visible_drill_dims(role)
+
+
+def _redactions_for(metric: str, role: str | None) -> list[Redaction]:
+    """What policy withheld, read off the contract.
+
+    Never inferred by diffing against DRILL_DIMS: a redaction with no declared policy
+    behind it is exactly the unattributable refusal this feature exists to avoid.
+    """
+    contract = _contract_for_engine(metric)
+    if role is None or contract is None:
+        return []
+    return [
+        Redaction(dim=dim, policy_id=rule.policy_id, reason=rule.reason)
+        for rule in contract.access
+        if rule.role == role
+        for dim in rule.hidden_dims
+    ]
+
+
 def diagnose(
     metric: str = "mrr_renewals",
     as_of: date = DEFAULT_AS_OF,
     store: Store | None = None,
     cohort: Cohort | None = None,
     window: Window | None = None,
+    role: str | None = None,
 ) -> narrate.NarrationPayload | None:
     """Everything up to, but not including, prose. Returns None when there is no
     anomaly to explain.
@@ -42,6 +84,11 @@ def diagnose(
     computation. That is what makes "identical evidence, different narrative" a
     structural property rather than a coincidence of determinism: persona lives
     strictly downstream of this function, so it cannot reach a query.
+
+    `role` is the exception that proves that rule. Entitlement is NOT a rendering
+    concern: hiding a dimension changes which cuts are drilled, so it changes the
+    focal cohort and therefore the numbers. It must enter here, above the caching
+    boundary, and `app.py`'s cache key must include it.
     """
     store = store or get_store()
 
@@ -57,7 +104,7 @@ def diagnose(
         root = anomaly.detect(store, metric, as_of)
         if root is None:
             return None
-        nodes = anomaly.drill(store, root, config.DRILL_DIMS)
+        nodes = anomaly.drill(store, root, _visible_dims(metric, role))
 
     focal = anomaly.focal(nodes)
     symptoms = symptoms_mod.cluster(store, focal.window)
@@ -79,6 +126,7 @@ def diagnose(
         seasonal_pct=seasonal_pct,
         seasonal_query_id=seasonal_query_id,
         no_confident_cause=not ranked or ranked[0].total < config.SCORE_FLOOR,
+        redactions=_redactions_for(metric, role),
     )
 
 
