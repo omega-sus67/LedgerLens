@@ -5,8 +5,10 @@ Values marked SPEC-GAP deviate from IMPLEMENTATION_SPEC.md; each carries its rea
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
+from typing import NamedTuple
 
 SEED = 20260815
 
@@ -120,7 +122,64 @@ CI_LEVEL = 0.95
 # ---------------------------------------------------------------- investigator
 LLM_TEST_BUDGET = 6
 EXPLORER_QUERY_BUDGET = 12
-MODEL = "claude-sonnet-5"
+
+
+class ProviderSpec(NamedTuple):
+    """Everything that differs between one LLM vendor and another.
+
+    The point of this table is that it is the ONLY place a vendor is named. Adding a
+    provider is a row here plus a transport class in `ledgerlens/llm.py`; nothing in
+    the investigator, the pipeline, the narrator or the UI mentions a vendor.
+
+    Prices are USD per million tokens, as published on 2026-08-30, and they are used
+    for ONE purpose: the estimated-cost figure in the telemetry panel. They are the
+    only numbers in this repo that can go stale without a test failing, because no
+    query can verify a vendor's price list. The panel labels the figure "estimated"
+    for exactly that reason.
+    """
+
+    name: str
+    model: str
+    api_key_env: str
+    price_in_per_mtok: float
+    price_out_per_mtok: float
+
+
+PROVIDERS: dict[str, ProviderSpec] = {
+    "gemini": ProviderSpec("gemini", "gemini-2.5-flash", "GEMINI_API_KEY", 0.30, 2.50),
+    "anthropic": ProviderSpec("anthropic", "claude-sonnet-5", "ANTHROPIC_API_KEY", 2.00, 10.00),
+}
+
+# Selected provider. Env-overridable so a judge can switch vendors without editing
+# source -- `LEDGERLENS_LLM_PROVIDER=anthropic streamlit run app.py` is the whole
+# migration. An unknown value is NOT an error here: config must stay importable with
+# a typo in the environment, or the deterministic pipeline stops running because of a
+# setting that only the optional lane reads. `llm.resolve()` reports it instead.
+LLM_PROVIDER = os.environ.get("LEDGERLENS_LLM_PROVIDER", "gemini")
+
+# Override just the model id without changing provider (e.g. pinning a dated
+# snapshot, or moving Flash -> Pro for a quality comparison on stage).
+LLM_MODEL_OVERRIDE = os.environ.get("LEDGERLENS_LLM_MODEL", "")
+
+LLM_TIMEOUT_S = 30.0
+LLM_MAX_OUTPUT_TOKENS = 2048
+# Temperature 0 everywhere. The investigator lane is additive to a deterministic
+# spine; sampling variance in it buys nothing and costs reproducibility on stage.
+LLM_TEMPERATURE = 0.0
+
+
+def provider_spec(name: str | None = None) -> ProviderSpec | None:
+    """The active provider's spec, or None when the configured name is unknown."""
+    spec = PROVIDERS.get(name or LLM_PROVIDER)
+    if spec is None:
+        return None
+    return spec._replace(model=LLM_MODEL_OVERRIDE or spec.model)
+
+
+# Kept as a module-level name because the telemetry copy and tests/test_docs.py both
+# quote it. It is now DERIVED from the provider table rather than hardcoded, so the
+# two can no longer disagree.
+MODEL = (provider_spec() or PROVIDERS["gemini"]).model
 
 # ---------------------------------------------------------------- generator
 GEN_START = date(2025, 3, 1)

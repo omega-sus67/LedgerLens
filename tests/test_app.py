@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import re
+
 import pytest
 
 from streamlit.testing.v1 import AppTest
@@ -159,7 +161,12 @@ def test_switching_persona_recomputes_instead_of_serving_a_stale_payload(truth):
 
 def test_telemetry_panel_states_the_zero_and_prices_the_alternative(truth):
     """MPE rows 9 and 10 on the page, not just in the README. The zero is only an
-    argument if the alternative is priced beside it."""
+    argument if the alternative is priced beside it.
+
+    The app under test has no API key, so this asserts the DEFAULT state: the
+    investigator lane is off, the panel says so in the same breath as saying what
+    turning it on would cost. Both halves matter -- a zero with no priced alternative
+    reads as an omission, and a price with no zero reads as a bill."""
     at = AppTest.from_file(APP_PATH, default_timeout=180).run()
     text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
     assert at.exception == []
@@ -167,6 +174,27 @@ def test_telemetry_panel_states_the_zero_and_prices_the_alternative(truth):
     assert "$0.0000" in text
     assert config.MODEL in text, "the counterfactual must be priced, not waved at"
     assert "no query_id" in text, "the telemetry carve-out must be stated, not hidden"
+    assert "LLM vs non-LLM, precisely" in text, "MPE row 9 needs the explicit split"
+
+
+def test_the_ai_lane_is_off_and_says_why_when_no_key_is_configured(truth):
+    """A disabled control with no explanation is the silent degradation this product
+    argues against everywhere else. The sidebar must name the env var."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    assert at.exception == []
+    sidebar_text = " ".join(c.value for c in at.sidebar.caption)
+    spec = config.provider_spec()
+    assert spec is not None
+    assert spec.api_key_env in sidebar_text, "the sidebar must name the key that enables the lane"
+    assert any(cb.label == "Run the AI investigator" and cb.disabled for cb in at.sidebar.checkbox)
+
+
+def test_the_investigator_toggle_does_not_displace_the_source_drop_toggle(truth):
+    """`tests/test_abstention.py` and the test below address the source-drop switch by
+    INDEX. Adding a checkbox above it would silently retarget both. Pinning the order
+    here means that mistake fails loudly in one obvious place."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    assert at.sidebar.checkbox[0].label == "Deploy source (github) not connected"
 
 
 def test_the_source_drop_toggle_makes_abstention_reachable(truth):
@@ -190,3 +218,139 @@ def test_toggling_the_drop_back_off_restores_the_diagnosis(truth):
     assert at.title[0].value != baseline
     at.sidebar.checkbox[0].set_value(False).run()
     assert at.title[0].value == baseline, "stale payload served after toggling back"
+
+
+# ------------------------------------------------------- the investigator lane
+#
+# The panels below are behind `if investigate or card.proposed_tests`, so the tests
+# above -- which run without a key -- never execute a line of them. A UI branch that
+# only runs on stage is a UI branch that breaks on stage.
+
+
+class _StubProvider:
+    """Stands in for the vendor so the panels render with no key and no network."""
+
+    def __init__(self):
+        import config
+
+        self.spec = config.PROVIDERS["gemini"]
+
+    def structured(self, system, prompt, schema, name):
+        from ledgerlens import llm
+
+        usage = llm.Usage(4000, 800, 0.0032)
+        if name == "propose_tests":
+            return {
+                "tests": [
+                    {
+                        "template": "compare_cohort",
+                        "rationale": "If the connector broke, DACH card renewals should be untouched.",
+                        "prediction": "should_be_flat",
+                        "region": ["DACH"],
+                        "payment_rail": ["card"],
+                    },
+                    {
+                        "template": "compare_cohort",
+                        "rationale": "hallucinated region",
+                        "prediction": "should_be_flat",
+                        "region": ["Wakanda"],
+                    },
+                ]
+            }, usage, ""
+        if name == "unverified_causes":
+            return {
+                "causes": [
+                    {
+                        "description": "A competitor undercut enterprise SEPA pricing in DACH.",
+                        "needed_source": "win/loss notes in the CRM",
+                        "would_test": "churn reason codes for DACH Enterprise in the window",
+                    }
+                ]
+            }, usage, ""
+        return {
+            "headline": "Enterprise SEPA renewals in DACH broke, and a connector release explains it.",
+            "summary": "The affected cohort is down sharply against its own baseline. The deploy survived every negative control; the marketing decoy did not.",
+        }, usage, ""
+
+
+@pytest.fixture
+def stub_llm(monkeypatch):
+    from ledgerlens import llm
+
+    monkeypatch.setattr(llm, "resolve", lambda provider=None: (_StubProvider(), ""))
+    yield
+
+
+def test_the_investigator_panels_render_with_the_lane_on(truth, stub_llm):
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    box = [cb for cb in at.sidebar.checkbox if cb.label == "Run the AI investigator"][0]
+    assert not box.disabled, "a resolvable provider must enable the control"
+    at = box.set_value(True).run()
+    assert at.exception == []
+
+    text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
+    assert "The investigator lane" in " ".join(h.value for h in at.subheader)
+    assert "1 accepted, 1 rejected by validation" in text, "the denominator must be shown"
+    assert "competitor undercut" in text, "the unverifiable-causes panel did not render"
+    assert "additive" in text
+
+
+def test_the_lane_reports_its_real_cost_not_a_hypothetical(truth, stub_llm):
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    box = [cb for cb in at.sidebar.checkbox if cb.label == "Run the AI investigator"][0]
+    at = box.set_value(True).run()
+    text = " ".join(m.value for m in at.markdown)
+    assert "gemini-2.5-flash" in text
+    assert "LLM vs non-LLM, precisely" in text
+    calls = int(re.search(r"This diagnosis: (\d+) LLM calls", text).group(1))
+    assert calls == 3, f"three call sites should have fired, got {calls}"
+
+
+def test_rerendering_does_not_inflate_the_llm_bill(truth, stub_llm):
+    """Regression. `load_payload` caches the payload, and the payload used to carry the
+    budget that narration recorded into -- so every re-render (a persona switch, any
+    widget click) added another call and another charge to the SAME object, climbing
+    for as long as the reader kept clicking. Narration now uses its own budget.
+
+    Three calls after the first render, and three after switching persona twice."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    box = [cb for cb in at.sidebar.checkbox if cb.label == "Run the AI investigator"][0]
+    at = box.set_value(True).run()
+
+    def calls_now(app):
+        text = " ".join(m.value for m in app.markdown)
+        return int(re.search(r"This diagnosis: (\d+) LLM calls", text).group(1))
+
+    assert calls_now(at) == 3
+    at = at.sidebar.selectbox[1].select("cfo").run()
+    assert calls_now(at) == 3, "switching persona must not re-bill the pipeline calls"
+    at = at.sidebar.selectbox[1].select("analyst").run()
+    assert calls_now(at) == 3, "the bill must not climb with every click"
+
+
+def test_llm_prose_is_marked_as_such_on_the_page(truth, stub_llm):
+    """A reader must be able to tell model-written prose from template prose, and that
+    the guard is what permitted it."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    box = [cb for cb in at.sidebar.checkbox if cb.label == "Run the AI investigator"][0]
+    at = box.set_value(True).run()
+    assert at.exception == []
+    successes = " ".join(s.value for s in at.success)
+    assert "numbers guard" in successes
+    assert "written by the model" in successes
+
+
+def test_the_ranking_on_screen_is_unchanged_by_the_lane(truth, stub_llm):
+    """The invariant, asserted through the UI rather than the API -- this is the
+    version a judge can watch happen."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    before = at.title[0].value
+    box = [cb for cb in at.sidebar.checkbox if cb.label == "Run the AI investigator"][0]
+    at = box.set_value(True).run()
+    assert at.exception == []
+    assert before != at.title[0].value, "the LLM narrator should have rewritten the headline"
+    # The TITLE is prose and is expected to change. The RANKING is not: the same cause
+    # must still be named first, in the hypothesis cards below the fold.
+    text = " ".join(m.value for m in at.markdown)
+    assert "deploy_sepa_v214" in text, "the lane must not change which cause ranks first"
+    assert "campaign_dach_cut" in text, "the decoy must still be shown as rejected"

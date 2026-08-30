@@ -17,15 +17,18 @@ from datetime import date
 
 import config
 from ledgerlens import personas
+from ledgerlens import llm as llm_mod
 from ledgerlens.models import (
     Action,
     Anomaly,
     DiagnosisCard,
     EvidenceStep,
     Hypothesis,
+    ProposedTest,
     Redaction,
     SymptomCluster,
     Telemetry,
+    UnverifiedHypothesis,
     cohort_label,
 )
 
@@ -116,6 +119,20 @@ class NarrationPayload:
     # name what is missing instead of asserting a hardcoded connectivity story that
     # the simulation has just made false.
     drop_sources: frozenset[str] = frozenset()
+    # ---- investigator lane (docs/ai_decisions.md). All three default to the empty,
+    # provider-free state, so every existing construction site is unchanged and a
+    # payload built without the lane renders exactly the card it rendered before.
+    proposed_tests: list[ProposedTest] = field(default_factory=list)
+    unverified: list[UnverifiedHypothesis] = field(default_factory=list)
+    # Carried rather than recomputed, like telemetry: narration ADDS its own call to
+    # this budget (only it can time and price its own stage), but it never re-derives
+    # the two the pipeline already made.
+    llm_budget: "llm_mod.Budget | None" = None
+    proposal_rejections: list[str] = field(default_factory=list)
+    # Whether site 4 may run. Kept separate from `llm_budget is not None` because a
+    # reader can want AI-proposed checks without wanting AI-written prose, and the
+    # narration is the only site whose output a human reads as fact.
+    llm_narration: bool = False
 
 
 def _money(x: float) -> str:
@@ -207,6 +224,34 @@ def narrate(
         if (abstain or not payload.ranked)
         else _cause_card(payload, who)
     )
+
+    # ---- site 4: guarded LLM narration.
+    #
+    # The template card is built FIRST and unconditionally, then optionally
+    # overwritten. That order is the whole safety argument: the LLM is handed a
+    # finished, verified card as its corpus, so it is rewriting prose that already
+    # exists rather than composing from the raw payload, and the fallback needs no
+    # separate code path -- it is simply the card we already built.
+    guard_rejections: list[str] = []
+    # A FRESH budget, never payload.llm_budget. The payload is cached by
+    # app.load_payload, so recording into its budget would make every re-render --
+    # switching persona, ticking any box -- add another call and another charge to the
+    # same object. See llm.Budget.plus.
+    narration_budget = llm_mod.Budget()
+    if payload.llm_narration and payload.llm_budget is not None:
+        from ledgerlens import investigator
+
+        headline, summary, guard_rejections = investigator.narrate_prose(
+            _narration_corpus(card, payload), who, narration_budget
+        )
+        if headline and summary:
+            card = card.model_copy(
+                update={"headline": headline, "summary": summary, "generated_by": "llm"}
+            )
+
+    card = card.model_copy(
+        update={"proposed_tests": payload.proposed_tests, "unverified": payload.unverified}
+    )
     narrate_ms = (time.perf_counter() - start) * 1000
 
     if payload.telemetry is None:
@@ -232,9 +277,78 @@ def narrate(
             # before narration started. Extend it, or the panel lists a stage that
             # its own total excludes and the share column sums past 100%.
             "total_ms": payload.telemetry.total_ms + narrate_ms,
+            **_llm_telemetry(payload, guard_rejections, narration_budget),
         }
     )
     return card.model_copy(update={"telemetry": telemetry})
+
+
+def _llm_telemetry(
+    payload: NarrationPayload, guard_rejections: list[str], narration_budget: "llm_mod.Budget"
+) -> dict:
+    """Fold the investigator lane's budget into the telemetry model.
+
+    Returns {} when the lane never ran, so the Telemetry defaults stand and a
+    deterministic diagnosis reports no provider rather than a provider that made zero
+    calls -- those are different states and the panel says which one it is in.
+    """
+    base = payload.llm_budget
+    if base is None:
+        return {}
+    budget = base.plus(narration_budget)
+    if budget.calls == 0 and not budget.failures:
+        return {}
+    spec = config.provider_spec()
+    return {
+        "llm_calls": budget.calls,
+        "llm_tokens": budget.total_tokens,
+        "llm_cost_usd": budget.cost_usd,
+        "llm_provider": spec.name if spec else config.LLM_PROVIDER,
+        "llm_model": spec.model if spec else "",
+        "llm_proposals_rejected": len(payload.proposal_rejections),
+        "llm_guard_rejections": guard_rejections,
+        "llm_failures": list(budget.failures),
+    }
+
+
+def _narration_corpus(card: DiagnosisCard, payload: NarrationPayload) -> str:
+    """Everything the narrator is allowed to say, and therefore everything the numbers
+    guard will accept.
+
+    Built from the FINISHED template card rather than from the payload, so the two can
+    never disagree about what a legal number is. If a figure is not in here, the guard
+    treats it as invented -- which means anything a reader might reasonably want in the
+    prose has to be added to this corpus deliberately, not discovered by the model.
+    """
+    parts = [f"HEADLINE: {card.headline}", f"SUMMARY: {card.summary}", "", "EVIDENCE:"]
+    parts += [f"- {s.claim} -> {s.observed}" for s in card.causal_chain]
+    if card.effect:
+        parts.append(
+            f"- observed shortfall {card.effect.impact_abs:,.0f} "
+            f"(actual {card.effect.actual:,.0f} against counterfactual {card.effect.counterfactual:,.0f})"
+        )
+    parts += ["", "RANKED EXPLANATIONS:"]
+    for i, h in enumerate(card.ranked, 1):
+        parts.append(f"- #{i} {h.event.event_id} score {h.total:.3f}: {h.event.description}")
+        parts += [
+            f"    control {c.name}: {c.prediction}, observed {c.observed_delta_pct:+.1f}%, "
+            f"{'passed' if c.passed else 'failed'}"
+            for c in h.controls
+        ]
+    for h in card.rejected:
+        parts.append(f"- REJECTED {h.event.event_id} score {h.total:.3f}: {h.rejection_reason}")
+    parts += ["", "RECOMMENDED ACTIONS:"]
+    parts += [f"- [{a.priority}] {a.owner}: {a.action} (expected: {a.expected_impact})" for a in card.actions]
+    parts.append("")
+    parts.append(
+        f"CALENDAR: {payload.seasonal_pct:+.1f}% of the move is normal seasonality; "
+        f"the anomaly window is {payload.focal.window.start} to {payload.focal.window.end}."
+    )
+    if card.redactions:
+        parts.append(
+            "WITHHELD BY POLICY: " + ", ".join(f"{r.dim} ({r.policy_id})" for r in card.redactions)
+        )
+    return "\n".join(parts)
 
 
 def _route(action: Action, who: personas.Persona) -> Action:

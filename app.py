@@ -21,7 +21,7 @@ import pandas as pd
 import streamlit as st
 
 import config
-from ledgerlens import contracts, narrate, personas, pipeline
+from ledgerlens import contracts, llm, narrate, personas, pipeline
 from ledgerlens.models import DiagnosisCard, Window, cohort_label
 
 st.set_page_config(page_title="LedgerLens", page_icon="🔎", layout="wide")
@@ -35,6 +35,7 @@ def load_payload(
     window_key: str = "",
     role_key: str = "",
     drop_key: str = "",
+    investigate: bool = False,
 ):
     """Cached on everything that changes the PAYLOAD.
 
@@ -49,6 +50,11 @@ def load_payload(
     removing a source removes candidates, which changes the answer. Task 5's feedback
     would go here too. This is the cache-key debt docs/persona_decisions.md sec 10 left
     unpaid, paid once rather than three times.
+
+    `investigate` is the FOURTH, and it earns its place on the same test: the lane runs
+    real queries and puts their results on the card. Note the asymmetry with persona --
+    the investigator changes what is SHOWN but provably not what was RANKED, and it
+    still belongs above the boundary because it costs money and latency to recompute.
     """
     import json
     from datetime import date
@@ -68,6 +74,7 @@ def load_payload(
         window=window,
         role=role_key or None,
         drop_sources=frozenset(drop_key.split(",")) if drop_key else frozenset(),
+        investigate=investigate,
     )
 
 
@@ -111,6 +118,32 @@ if drop_deploys:
     st.sidebar.caption(
         "🔌 Simulating a disconnected deploy feed. The card below should REFUSE to "
         "name a cause and say what it is missing."
+    )
+
+st.sidebar.subheader("AI investigator")
+_provider, _why_off = llm.resolve()
+_spec = config.provider_spec()
+if _provider is None:
+    investigate = False
+    st.sidebar.checkbox("Run the AI investigator", value=False, disabled=True)
+    st.sidebar.caption(
+        f"⚪ Off — {_why_off}. Set it and reload to enable. Everything on this page "
+        f"is produced without it; the lane is additive by design."
+    )
+else:
+    investigate = st.sidebar.checkbox(
+        "Run the AI investigator",
+        value=False,
+        help=(
+            "Adds three LLM call sites: proposed checks, unverifiable causes, and "
+            "persona-voiced prose. The model proposes; this engine executes and "
+            "scores. Nothing it returns can change a rank."
+        ),
+    )
+    st.sidebar.caption(
+        f"🟢 `{_spec.name}` · `{_spec.model}` · "
+        f"${_spec.price_in_per_mtok:.2f}/${_spec.price_out_per_mtok:.2f} per MTok. "
+        f"Switch vendor with `LEDGERLENS_LLM_PROVIDER`."
     )
 
 st.sidebar.subheader("Scoring weights")
@@ -163,7 +196,7 @@ if kpi.status == "sparse_history":
     window_key = json.dumps([w_start.isoformat(), w_end.isoformat()])
 
 store, payload = load_payload(
-    metric, as_of.isoformat(), cohort_key, window_key, who.role, drop_key
+    metric, as_of.isoformat(), cohort_key, window_key, who.role, drop_key, investigate
 )
 card = (
     narrate.narrate(payload, persona=who)
@@ -486,6 +519,87 @@ for a in card.actions:
 
 st.divider()
 
+# ---------------------------------------------------- 4b. the investigator lane
+#
+# Two panels, deliberately AFTER the evidence chain and the ranked hypotheses. The
+# reading order is the argument: a judge sees the deterministic verdict, then what the
+# model added on top, and can tell at a glance which is which. Putting AI output above
+# verified evidence would invert the claim this product makes.
+
+if investigate or card.proposed_tests or card.unverified:
+    st.subheader("🤖 The investigator lane")
+    st.caption(
+        "The model proposes; this engine disposes. Everything below is **additive** — "
+        "it is excluded from the N score, so the ranking above is identical with this "
+        "lane on or off."
+    )
+
+    t = card.telemetry
+    n_rejected = t.llm_proposals_rejected if t else 0
+
+    st.markdown("**AI-proposed checks** — filled from a fixed template vocabulary, executed in SQL by the engine.")
+    if card.proposed_tests:
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "check": pt.rationale,
+                        "template": pt.template,
+                        "cohort": cohort_label({k: v for k, v in pt.params.items() if isinstance(v, list)}),
+                        "predicted": str(pt.params.get("prediction", "")).replace("_", " "),
+                        "observed": (f"{pt.result.observed_delta_pct:+.1f}%" if pt.result else "not answerable"),
+                        "verdict": ("held" if pt.result.passed else "FAILED") if pt.result else "—",
+                        "query_id": pt.result.query_id if pt.result else "",
+                    }
+                    for pt in card.proposed_tests
+                ]
+            ),
+            width="stretch",
+            hide_index=True,
+        )
+        st.caption(
+            f"**{len(card.proposed_tests)} accepted, {n_rejected} rejected by validation.** "
+            f"Every accepted check carries a replayable `query_id`, exactly like a "
+            f"rule-based control. A rejected one named a dimension value, metric or "
+            f"template that does not exist — the gate is why those never became a query."
+        )
+    elif investigate:
+        st.caption(
+            f"No check survived validation ({n_rejected} rejected). That is a reported "
+            f"outcome, not a blank panel."
+        )
+
+    st.markdown("**Possible causes we cannot verify with connected data**")
+    if card.unverified:
+        st.warning(
+            "Not tested. These are the honest answer to *what if the real cause was "
+            "never recorded?* — each names the feed that would settle it."
+        )
+        for u in card.unverified:
+            st.markdown(f"- **{u.description}**")
+            st.caption(f"would need: {u.needed_source}  ·  would test: {u.would_test}")
+    elif investigate:
+        st.caption("The model named nothing outside the connected sources.")
+
+    if card.generated_by == "llm":
+        st.success(
+            "✍️ The headline and summary above were written by the model and passed the "
+            "**numbers guard**: every figure in them appears in the verified payload. "
+            "A single invented digit would have discarded them for the template version."
+        )
+    elif investigate and card.telemetry and card.telemetry.llm_guard_rejections:
+        st.error(
+            f"✍️ The model's prose was **discarded**: it introduced "
+            f"{card.telemetry.llm_guard_rejections} which appear nowhere in the verified "
+            f"payload. You are reading the deterministic template instead. This is the "
+            f"guard working, not the system failing."
+        )
+
+    if card.telemetry and card.telemetry.llm_failures:
+        st.caption("Lane failures: " + " · ".join(card.telemetry.llm_failures))
+
+    st.divider()
+
 # ------------------------------------------------------------- 5. telemetry
 #
 # Closes two rubric rows at once: runtime telemetry, and the LLM vs non-LLM
@@ -502,7 +616,11 @@ with st.expander("⏱ Telemetry — latency, database work, model calls, cost"):
             "Queries executed", t.queries_executed, delta=f"{t.queries_cached} cached"
         )
         m3.metric("Replayable on this card", t.queries_on_card)
-        m4.metric("LLM cost", f"${t.llm_cost_usd:.4f}", delta=f"{t.llm_calls} calls")
+        m4.metric(
+            "LLM cost",
+            t.llm_cost_str,
+            delta=f"{t.llm_calls} calls · {t.llm_tokens:,} tokens" if t.llm_calls else "0 calls",
+        )
 
         st.markdown("**Where the time goes**")
         st.dataframe(
@@ -520,20 +638,45 @@ with st.expander("⏱ Telemetry — latency, database work, model calls, cost"):
             hide_index=True,
         )
 
+        if t.llm_calls:
+            st.markdown(
+                f"**This diagnosis: {t.llm_calls} LLM calls, {t.llm_tokens:,} tokens, "
+                f"{t.llm_cost_str}** on `{t.llm_provider}` / `{t.llm_model}`. "
+                f"Every one of those calls sits in the **investigator lane**, which is "
+                f"additive: it proposed checks and prose. It did not rank, score or "
+                f"reject anything. The {t.queries_on_card} replayable queries behind "
+                f"this card were produced by deterministic SQL either way."
+            )
+        else:
+            st.markdown(
+                f"**This diagnosis: 0 LLM calls, $0.0000.** Every number on this page "
+                f"came from a logged SQL query with a replayable `query_id`. The "
+                f"ranking path is deterministic Python and SQL **by design, not by "
+                f"omission** — which is why the full test suite and this entire demo "
+                f"run with no API key set. Turn on the **AI investigator** in the "
+                f"sidebar to add the LLM lane on top."
+            )
+            _s = config.provider_spec()
+            if _s is not None:
+                st.markdown(
+                    f"**What the lane would cost.** With the investigator enabled it "
+                    f"makes **three calls per diagnosis** on `{_s.model}` — proposed "
+                    f"checks, unverifiable causes, narration — at roughly 6k input and "
+                    f"1.2k output tokens total, about "
+                    f"**${(6000 / 1e6) * _s.price_in_per_mtok + (1200 / 1e6) * _s.price_out_per_mtok:.4f}** "
+                    f"at ${_s.price_in_per_mtok:.2f} / ${_s.price_out_per_mtok:.2f} per "
+                    f"MTok. It would add checks and change the prose, and **none of the "
+                    f"numbers above**: the ranking path never calls a model."
+                )
         st.markdown(
-            f"**This diagnosis: {t.llm_calls} LLM calls, {t.llm_tokens} tokens, "
-            f"${t.llm_cost_usd:.4f}.** Every number on this page came from a logged "
-            f"SQL query with a replayable `query_id`. The ranking path is "
-            f"deterministic Python and SQL **by design, not by omission** — which is "
-            f"why the full test suite and this entire demo run with "
-            f"`ANTHROPIC_API_KEY` unset."
-        )
-        st.markdown(
-            f"With the optional LLM narrator enabled, narration alone would add about "
-            f"**one call per diagnosis** on `{config.MODEL}` — roughly 3.5k input and "
-            f"600 output tokens, about **$0.013** at $2.00 / $10.00 per MTok. It would "
-            f"change the prose and **none of the numbers**: narration reads every "
-            f"figure off the payload and computes nothing."
+            f"**LLM vs non-LLM, precisely.** Non-LLM: detection, attribution, cohort "
+            f"intersection, all five score components, every negative control, and the "
+            f"rejection of the decoy — {t.queries_executed} queries, no model involved. "
+            f"LLM: proposing extra checks (which this engine then executes in SQL), "
+            f"listing causes outside the connected data, and writing the prose. The "
+            f"boundary is enforced in code, not by convention: proposed checks are "
+            f"constructed with `decisive=False` and are never passed to "
+            f"`controls.score_n`."
         )
         st.caption(
             "Telemetry carries **no query_id**, and that is deliberate: latency is a "

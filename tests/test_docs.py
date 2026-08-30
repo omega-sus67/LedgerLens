@@ -48,7 +48,39 @@ def test_readme_test_count_is_true():
     assert claimed == {actual}, f"README claims {claimed or '{}'}, suite has {actual}"
 
 
-def test_configured_model_is_a_real_anthropic_model_id():
-    """`MODEL` is dead config today (nothing calls the API), which is exactly why
-    it rots unnoticed. It is still the string a judge reads in `config.py`."""
-    assert config.MODEL == "claude-sonnet-5"
+def test_every_provider_row_is_complete():
+    """`MODEL` is no longer dead config -- `ledgerlens/llm.py` calls the API through
+    it. It is also no longer a vendor string: pinning one here would re-hardcode the
+    coupling that `config.PROVIDERS` exists to remove, so the guard moved to the seam.
+
+    What must stay true is that every declared provider is USABLE: a model id, the env
+    var that unlocks it, and both prices, or the telemetry panel divides by a missing
+    number the first time someone switches vendor on stage.
+    """
+    assert config.PROVIDERS, "at least one provider must be declared"
+    for name, spec in config.PROVIDERS.items():
+        assert spec.name == name, f"{name!r} keys a row named {spec.name!r}"
+        assert spec.model, f"{name} declares no model id"
+        assert spec.api_key_env.endswith("_API_KEY"), f"{name}: {spec.api_key_env} is not an api-key env var"
+        assert spec.price_in_per_mtok > 0 and spec.price_out_per_mtok > 0, f"{name} is unpriced"
+
+
+def test_every_provider_has_a_transport():
+    """A row in the table with no adapter behind it is a provider that resolves to a
+    clean error message instead of an LLM -- the failure is graceful, which is exactly
+    why it would ship unnoticed."""
+    from ledgerlens import llm
+
+    assert set(config.PROVIDERS) == set(llm._ADAPTERS), (
+        f"providers {sorted(config.PROVIDERS)} but transports {sorted(llm._ADAPTERS)}"
+    )
+
+
+def test_readme_documents_the_default_provider():
+    """The README tells a judge which vendor runs by default and which env var turns
+    it on. Both are claims about config, so both are assertions."""
+    readme = (Path(config.ROOT) / "README.md").read_text()
+    spec = config.provider_spec()
+    assert spec is not None, f"default provider {config.LLM_PROVIDER!r} is not in the table"
+    assert spec.model in readme, f"README never names the default model {spec.model}"
+    assert spec.api_key_env in readme, f"README never names {spec.api_key_env}"

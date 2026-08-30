@@ -40,15 +40,24 @@ Three further things stated plainly:
 
 ```bash
 uv venv --python 3.12
-uv pip install --python .venv/bin/python duckdb pandas pyarrow numpy scipy statsmodels pydantic streamlit plotly anthropic pytest
+uv pip install --python .venv/bin/python duckdb pandas pyarrow numpy scipy statsmodels pydantic streamlit plotly httpx anthropic pytest
 
 .venv/bin/python -m ledgerlens.gen_data    # writes data/*.parquet, *.json, ground_truth.json
-.venv/bin/python -m pytest -q              # 229 tests
+.venv/bin/python -m pytest -q              # 293 tests
 .venv/bin/python -m ledgerlens.pipeline    # prints the diagnosis card to stdout
 .venv/bin/python -m streamlit run app.py   # the analyst UI
 ```
 
-No API key required — and that is a design property, not a limitation. Everything on the ranking path is deterministic Python and SQL, so the full test suite and the entire demo run with `ANTHROPIC_API_KEY` unset.
+No API key required — and that is a design property, not a limitation. Everything on the ranking path is deterministic Python and SQL, so the full test suite and the entire demo run with no API key set.
+
+**The AI investigator is the layer on top of that, and it is optional by construction.** Export a key and tick one sidebar box to enable it:
+
+```bash
+export GEMINI_API_KEY=...                       # default provider
+.venv/bin/python -m streamlit run app.py
+```
+
+It adds three LLM call sites — proposed checks, unverifiable causes, and persona-voiced prose — and **none of them can change a rank**. The system is provider-agnostic: `LEDGERLENS_LLM_PROVIDER=anthropic` switches vendor with no source change, and `LEDGERLENS_LLM_MODEL=gemini-2.5-pro` swaps the model within one. See [**LLM versus non-LLM**](#llm-versus-non-llm-and-what-a-diagnosis-costs) below and [`docs/ai_decisions.md`](docs/ai_decisions.md) for the full design.
 
 > On this machine a ROS install pollutes `PYTHONPATH`. If `pytest` fails importing `yaml`, prefix commands with `env -u PYTHONPATH -u VIRTUAL_ENV`.
 
@@ -311,9 +320,30 @@ was refused. Full reasoning in
 ## LLM versus non-LLM, and what a diagnosis costs
 
 **Nothing on the ranking path calls a model.** Detection, attribution, candidate
-generation, scoring, negative controls and narration are deterministic Python and SQL.
-That is a design decision, not an omission — and the check is that the entire test suite
-and the whole demo run with `ANTHROPIC_API_KEY` unset.
+generation, scoring and negative controls are deterministic Python and SQL. That is a
+design decision, not an omission — and the check is that the entire test suite and the
+whole demo run with no API key set.
+
+**On top of that sits the investigator lane**, and the split is exact:
+
+| | Who does it | What it may touch |
+|---|---|---|
+| detection, drill-down, cohort intersection, T/C/D/N/P, negative controls, decoy rejection | **deterministic SQL + Python** | the verdict |
+| proposing *additional* checks from a fixed template vocabulary | **LLM proposes → this engine executes in SQL** | the card, never the score |
+| listing causes that connected data cannot test | **LLM** | a separately-labelled panel |
+| writing the headline and summary for one reader | **LLM, behind a numbers guard** | prose only |
+
+The boundary is enforced in code rather than by convention. Proposed checks are
+constructed with `decisive=False` — the field `controls.score_n` reads to zero out N —
+and are never passed to it. `test_the_lane_cannot_change_a_single_score` asserts that
+every score is byte-identical with the lane on and off.
+
+**Three guards, each of which reports what it caught.** Proposals naming a dimension
+value, metric or template that does not exist are rejected *before* becoming a query,
+and the count is shown ("4 accepted, 2 rejected by validation"). The narrator is given
+every figure it may use, and any number in its prose that was not in that corpus
+discards the narration wholesale in favour of the deterministic template — the page says
+so when it happens. A vendor outage is reported as an outage, never as "nothing found".
 
 The ⏱ **Telemetry** panel puts the accounting on the page:
 
@@ -341,11 +371,12 @@ honest cost accounting — so both are shown, under names that cannot be confuse
 Metadata lookups (`dim_universe`, `events`) are counted in neither: they carry no
 user-facing number and therefore no `query_id`.
 
-**The zero, priced.** With the optional LLM narrator enabled, narration alone would add
-about one call per diagnosis on `claude-sonnet-5` — roughly 3.5k input and 600 output
-tokens, about **$0.013** at $2.00 / $10.00 per MTok. It would change the prose and none
-of the numbers, because narration reads every figure off the payload and computes
-nothing.
+**The zero, priced.** That row is the *default* state, with the investigator lane
+switched off. Turned on, it makes three calls per diagnosis on `gemini-2.5-flash` —
+roughly 6k input and 1.2k output tokens, about **$0.0048** at $0.30 / $2.50 per MTok
+(`GEMINI_API_KEY`). Switching to `claude-sonnet-5` via `LEDGERLENS_LLM_PROVIDER=anthropic`
+costs about **$0.0240** at $2.00 / $10.00 per MTok and requires no source change. Either
+way it adds checks and rewrites prose, and changes **none of the numbers above**.
 
 Telemetry is one of exactly **two** numbers on the page that carry no `query_id` — the
 other is the redaction notice. Both are facts about the *process* rather than the data,
@@ -409,13 +440,17 @@ ledgerlens/
   hypothesis.py               candidates + five-component scoring
   controls.py                 negative control generation and evaluation
   learning.py                 Beta-Bernoulli priors
-  narrate.py                  template narrator
+  narrate.py                  template narrator + guarded LLM narration
+  llm.py                      provider seam: gemini + anthropic adapters
+  investigator.py             the LLM lane: proposed checks, unverified causes, guard
   pipeline.py                 orchestration
-tests/                        229 tests; test_pipeline.py is the acceptance test
+tests/                        293 tests; test_pipeline.py is the acceptance test
 ```
 
 Deviations from `IMPLEMENTATION_SPEC.md` are marked `# SPEC-GAP:` at the point of departure, with the reason. The substantive ones are the three control-rule fixes described above and the practical-significance gate (`MIN_ABS_DELTA_PCT`) that makes the "no false flag before the incident" test deterministic rather than a coin flip.
 
 ## Not built in this cut
 
-Per the spec's own MVP path: `effect.py` (diff-in-differences with bootstrap CI), `ambiguity.py` (the discriminating test), the confirm/reject learning loop in the UI, `ledger/normalizer.py`, and the investigator lane (`propose_tests`, `unverified_causes`, bounded `explore`). All four LLM call sites are additive by design and none sits on the ranking path, which is why their absence changes no result here.
+Per the spec's own MVP path: `effect.py` (diff-in-differences with bootstrap CI), `ambiguity.py` (the discriminating test), the confirm/reject learning loop in the UI, and the bounded `explore` pass.
+
+**`ledger/normalizer.py` — the LLM event normalizer — is deliberately cut rather than merely unbuilt.** It is the one call site of the four that is *not* additive: the spec has it multiply a hypothesis score by an LLM-emitted extraction confidence, which puts a model on the ranking path and contradicts the property every other part of this design protects. Its schema (`models.ExtractedSignal`) and fields (`ChangeEvent.extraction`, `.confidence`) stay declared as the honest record of a deferred decision. Reasoning in [`docs/ai_decisions.md`](docs/ai_decisions.md) D2.

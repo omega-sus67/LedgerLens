@@ -310,6 +310,26 @@ class Telemetry(BaseModel):
     llm_calls: int = 0
     llm_tokens: int = 0
     llm_cost_usd: float = 0.0
+    # Which vendor produced those calls. Empty when the investigator lane did not
+    # run, which is the state the whole deterministic demo runs in.
+    llm_provider: str = ""
+    llm_model: str = ""
+    # What the lane's guards CAUGHT. A validator that never reports a rejection is
+    # indistinguishable from one that is not running, so these are first-class
+    # telemetry rather than debug logging: `llm_proposals_rejected` counts checks the
+    # schema/universe gate threw away, `llm_guard_rejections` names the specific
+    # invented numbers that discarded a narration, and `llm_failures` carries
+    # transport and validation reasons for the sidebar.
+    llm_proposals_rejected: int = 0
+    llm_guard_rejections: list[str] = []
+    llm_failures: list[str] = []
+
+    @property
+    def llm_cost_str(self) -> str:
+        """Sub-cent costs render as $0.0000 at four places; Flash can land below that.
+        Six places when it would otherwise read as free, because "$0.0000" on an AI
+        challenge invites exactly the wrong question."""
+        return f"${self.llm_cost_usd:.6f}" if 0 < self.llm_cost_usd < 5e-5 else f"${self.llm_cost_usd:.4f}"
 
 
 class Action(BaseModel):

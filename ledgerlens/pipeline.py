@@ -11,7 +11,7 @@ import time
 from datetime import date
 
 import config
-from ledgerlens import anomaly, contracts, hypothesis, narrate, personas
+from ledgerlens import anomaly, contracts, hypothesis, investigator, llm, narrate, personas
 from ledgerlens.ledger import symptoms as symptoms_mod
 from ledgerlens.models import Anomaly, Cohort, DiagnosisCard, Redaction, Telemetry, Window
 from ledgerlens.store import Store
@@ -105,6 +105,7 @@ def diagnose(
     window: Window | None = None,
     role: str | None = None,
     drop_sources: frozenset[str] = frozenset(),
+    investigate: bool = False,
 ) -> narrate.NarrationPayload | None:
     """Everything up to, but not including, prose. Returns None when there is no
     anomaly to explain.
@@ -121,6 +122,14 @@ def diagnose(
 
     `drop_sources` is the same shape again: simulating a disconnected source removes
     candidates, which changes the answer. It joins the cache key too.
+
+    `investigate` is the FOURTH such input, exactly as this docstring predicted when
+    task 7 added the third. It turns on the LLM investigator lane
+    (docs/ai_decisions.md). It is above the payload boundary because the lane runs
+    queries and puts their results on the card -- but note what it still cannot do:
+    every figure it adds is additive, and none of it reaches `hypothesis.rank` or
+    `controls.score_n`, so the ranked order and every score are identical with it on
+    or off. `tests/test_investigator.py` asserts that.
     """
     store = store or get_store()
     watch = _Stopwatch()
@@ -157,6 +166,29 @@ def diagnose(
         "seasonal", lambda: anomaly.seasonal_estimate(store, metric, root.cohort)
     )
 
+    # ---- the investigator lane. Everything above this line is deterministic and
+    # stays deterministic; everything below is additive and fails open.
+    #
+    # It runs AFTER ranking on purpose: the model is shown the engine's conclusions
+    # and the controls already run, so it proposes checks that ATTACK them rather
+    # than re-deriving them. A lane that ran first would be guessing.
+    budget = llm.Budget()
+    proposed: list = []
+    rejections: list[str] = []
+    unverified: list = []
+    provider = llm.resolve()[0] if investigate else None
+    if provider is not None:
+        proposed, rejections = watch.time(
+            "propose",
+            lambda: investigator.propose_tests(store, focal, ranked, budget, provider),
+        )
+        unverified = watch.time(
+            "unverified",
+            lambda: investigator.unverified_causes(
+                store, focal, ranked, _contract_for_engine(metric), drop_sources, budget, provider
+            ),
+        )
+
     stats_after = store.stats_snapshot()
 
     return narrate.NarrationPayload(
@@ -172,6 +204,11 @@ def diagnose(
         no_confident_cause=not ranked or ranked[0].total < config.SCORE_FLOOR,
         redactions=_redactions_for(metric, role),
         drop_sources=drop_sources,
+        proposed_tests=proposed,
+        unverified=unverified,
+        proposal_rejections=rejections,
+        llm_budget=budget if investigate else None,
+        llm_narration=investigate,
         telemetry=Telemetry(
             stage_ms=watch.stage_ms,
             total_ms=watch.total_ms,
@@ -190,6 +227,7 @@ def run(
     role: str | None = None,
     persona: "personas.Persona | None" = None,
     drop_sources: frozenset[str] = frozenset(),
+    investigate: bool = False,
 ) -> DiagnosisCard:
     """Diagnose `metric` as of `as_of`.
 
@@ -211,6 +249,7 @@ def run(
         window=window,
         role=role,
         drop_sources=drop_sources,
+        investigate=investigate,
     )
     if payload is None:
         return DiagnosisCard.no_anomaly(metric, as_of)
@@ -228,6 +267,10 @@ def card_query_ids(card: DiagnosisCard) -> list[str]:
         ids.extend(h.query_ids)
         ids.extend(c.query_id for c in h.controls)
         ids.extend(s.query_id for s in h.symptoms if s.query_id)
+    # An AI-proposed check that executed carries a real query_id and is replayable
+    # exactly like a rule-based control, so it counts as auditable. A no-op when the
+    # investigator lane is off, which is why no existing telemetry number moves.
+    ids.extend(t.result.query_id for t in card.proposed_tests if t.result)
     return sorted({i for i in ids if i})
 
 
