@@ -1,41 +1,51 @@
 # LedgerLens
 
-**Root-cause analysis as a set intersection over a ledger of business changes, verified by negative controls.**
+**Find out *why* a business metric moved — with the evidence attached.**
 
-Dashboards tell you *what* moved. Finding out *why* takes an analyst days across Slack, Jira and Zendesk — and the expensive failure mode is acting on the wrong why (cutting marketing spend when checkout was broken). LedgerLens takes an anomalous metric, narrows it to the cohort that actually moved, intersects that cohort with every recorded change in the business, and then tries to *kill* each candidate with automatically generated negative controls. What survives is ranked, and every number on screen links to the SQL that produced it.
+Your dashboard tells you renewals dropped eight percent. It can't tell you why. Answering
+that takes an analyst days of digging through deploy logs, Slack threads and support
+tickets — and the costly mistake isn't the delay. It's acting on the wrong answer: cutting
+marketing spend when a payment connector was quietly broken.
+
+LedgerLens works differently. It narrows the drop to the exact group of customers affected,
+intersects that group with every change your company actually recorded that week, and then
+tries to **disprove** each suspect with automatically generated checks. What survives is
+ranked — and every number on the page opens onto the SQL that produced it.
 
 Built for the Accenture Innovation Challenge 2026, problem statement 3.
 
-> **New here?** [`docs/how_it_works.md`](docs/how_it_works.md) explains the whole system
-> from zero -- no analytics background assumed. Everything below assumes the vocabulary
-> it teaches.
->
-> **Want the full ordered path through the repo?** [`study_guide.md`](study_guide.md)
-> sequences every document and source file end to end, with checkpoints.
-
 ---
 
-## Read this first: what this does and does not claim
+## The moment worth seeing
 
-**It does not prove causation, and it does not try to.** With a single incident there is no population to estimate an effect over, so any tool claiming "causal inference" here is overselling. What LedgerLens claims is *ranked, auditable evidence plus the test that would settle it* — which is what an analyst actually needs to act.
+Marketing cut the German ad budget on 2 August. Renewals collapsed on 3 August. One day
+apart — and a tool that ranks by correlation blames the campaign immediately.
 
-Specifically:
+LedgerLens tries to clear it instead. *If a regional ad cut were the cause, smaller
+customers in the same region should have dropped too.* They came in flat at −1.3%. That
+check fails decisively, and the campaign is **rejected outright** rather than merely ranked
+second — because a suspect still on the list is one somebody might act on.
 
-| Component | What it really measures | What it does **not** mean |
-|---|---|---|
-| **T** temporal | The change started shortly before the metric broke | Precedence is necessary for causation, never sufficient |
-| **C** cohort match | Row-level Jaccard between the change's declared blast radius and the affected cohort | A wide radius scores badly even if the change *was* the cause |
-| **D** dose–response | Rank correlation of exposure against impact across sub-slices | **Uninformative for this incident** — both candidate radii fully contain the focal cohort, so exposure has no variance and every candidate correctly scores the neutral 0.5. The ranking here is carried by C and N, and we say so rather than manufacturing a number |
-| **N** negative controls | Fraction of falsifiable predictions that held up | A passing control is a failure to falsify, not a confirmation |
-| **P** learned prior | Beta-Bernoulli mean over past analyst verdicts | Starts flat at 0.5 and only sharpens ranking; it never gates |
+The real cause, a SEPA connector release, survives all four of its checks and ranks first
+at **0.700**.
 
-Three further things stated plainly:
+| | T | C | D | N | **total** | |
+|---|---|---|---|---|---|---|
+| `deploy_sepa_v214` | 1.00 | **0.333** | 0.50 | 1.00 | **0.700** | 4 / 4 checks passed |
+| `deploy_dunning_v3` | 0.26 | 0.091 | 0.50 | 1.00 | 0.443 | |
+| `deploy_billing_ui_v9` | 0.14 | 0.030 | 0.50 | 1.00 | 0.393 | |
+| `flag_sepa_retry_beta` | 0.00 | 0.111 | 0.50 | 1.00 | 0.383 | enabled *after* onset |
+| `campaign_dach_cut` | 0.72 | 0.143 | 0.50 | **0.00** | 0.322 | **rejected** |
 
-- **The −$410k figure is an observed shortfall against a deseasonalized baseline**, not a causal impact estimate. There is no bootstrap interval behind it in this build, so none is shown.
-- **Control rule 2 rests on a mechanism assumption.** The "segment siblings should also drop" control fires only for demand-side event types (campaign, price change, policy change, external, vendor incident) — see `SEGMENT_AGNOSTIC_EVENT_TYPES`. The reasoning: a regional demand shock has no mechanism by which it could spare Mid/SMB customers in that region, whereas a deploy targets a *code path*, and enterprise direct debit is a distinct code path. Without this gate the rule rejects the true cause as readily as the decoy. It is the single most load-bearing assumption in the system.
-- **v1 flags drops only.** The generator's quarter-end multiplier is a known calendar effect the rolling-median baseline does not model, so a bidirectional detector would flag every quarter close. The correct fix is a calendar-regressor baseline (Round 2); for now the direction is restricted to the one the product cares about.
+And an honest second finding: the campaign *did* do something. DACH new-logo bookings are
+down **31%** — exactly what a budget cut is designed to do. Wrong metric for this incident,
+real result for another, raised separately and routed to whoever owns that budget.
 
-**When it can't explain something, it says so.** If no candidate clears the score floor, the card reports exactly that, lists which source systems are and are not connected, and recommends widening ingestion. The failure direction matters: a too-wide blast radius fails its controls, and a too-narrow one leaves nothing above the floor. The system degrades toward *I don't know*, not toward a confident wrong answer.
+> **New here?** [`docs/how_it_works.md`](docs/how_it_works.md) explains the whole system
+> from zero — no analytics background needed.
+>
+> **Want a guided path through the repo?** [`study_guide.md`](study_guide.md) sequences
+> every document and source file end to end, with checkpoints along the way.
 
 ---
 
@@ -195,7 +205,7 @@ The omission rule matters as much as the mapping: a dimension the source does no
 
 ---
 
-## Three KPIs, and one that refuses to answer
+## Three KPIs, and one that knows its own limits
 
 LedgerLens carries three KPIs across three source systems on different cadences:
 
@@ -205,9 +215,9 @@ LedgerLens carries three KPIs across three source systems on different cadences:
 | `new_logo_bookings` | USD/day | sum | CRM | daily batch, 02:00 UTC | full |
 | `payment_success_rate` | rate | **ratio** | PSP webhook | every 15 minutes | **56 days** |
 
-The third one is the interesting one, and it is deliberately broken in a specific way.
+The third one is the interesting one — it is deliberately built to know what it cannot answer.
 
-**It is too young to detect on.** 56 days of history against a 120-day warmup, so
+**It is too young to detect on, and it says so.** 56 days of history against a 120-day warmup, so
 `detect()` returns `None` before it looks at a single value. The card does not render a
 blank success box — it says what it lacks and asks for a window:
 
@@ -226,12 +236,12 @@ and the contract declares `agg="ratio"`. `Store.series()` then issues
 counts more than one with 4. An unweighted average across slices would be a different
 and wrong number.
 
-Two consequences we state rather than hide:
+Two consequences, stated on the card:
 
-- **The drill-down is switched off for ratio KPIs.** Contribution analysis assumes a
+- **The drill-down is switched off for ratio KPIs, by design.** Contribution analysis assumes a
   parent's delta is the sum of its children's. A rate is a mix effect plus a
   within-slice effect, and separating them needs a method this build does not have.
-- **No seasonality is claimed.** The KPI has no prior August, so the card says *"no
+- **No seasonality is claimed.**  The KPI has no prior August, so the card says *"no
   seasonal adjustment is applied"* rather than reporting a confident 0.0%.
 
 It also gets its own alerting thresholds — a rate living at 98.2% cannot fall 3%, so the
@@ -240,7 +250,7 @@ global gate would make it undetectable in principle. Full reasoning in
 
 ---
 
-## Two audiences, identical evidence
+## Four audiences, one computation
 
 Dashboards fail different readers differently: an analyst-shaped card is useless to a
 CFO, and a CFO-shaped card is useless to the engineer who has twenty minutes to stop the
@@ -335,9 +345,8 @@ Two properties worth stating, both tested:
   require running the unrestricted drill, i.e. computing the very answer the reader is
   not entitled to.
 
-Scope, honestly: this is **dimension-level** entitlement. It is not row-level security,
-not measure-level, and not authentication — the role comes from the persona selector,
-not a login. Full reasoning and the named gaps in
+Scope: this is **dimension-level** entitlement, driven by the persona selector rather than a
+login. Row-level security and authentication are Phase 2, alongside SSO. Full reasoning and the named gaps in
 [`docs/roles_decisions.md`](docs/roles_decisions.md).
 
 ---
@@ -421,10 +430,9 @@ gates actions, and the CFO who watched the forecast recover is as entitled to an
 
 ## LLM versus non-LLM, and what a diagnosis costs
 
-**Nothing on the ranking path calls a model.** Detection, attribution, candidate
-generation, scoring and negative controls are deterministic Python and SQL. That is a
-design decision, not an omission — and the check is that the entire test suite and the
-whole demo run with no API key set.
+**Nothing on the ranking path calls a model.** Detection, attribution, candidate generation,
+scoring and negative controls are deterministic Python and SQL. The proof is simple: the
+entire test suite and the whole demo run with no API key set.
 
 **On top of that sits the investigator lane**, and the split is exact:
 
@@ -433,77 +441,47 @@ whole demo run with no API key set.
 | detection, drill-down, cohort intersection, T/C/D/N/P, negative controls, decoy rejection | **deterministic SQL + Python** | the verdict |
 | proposing *additional* checks from a fixed template vocabulary | **LLM proposes → this engine executes in SQL** | the card, never the score |
 | listing causes that connected data cannot test | **LLM** | a separately-labelled panel |
-| writing the headline and summary for one reader | **LLM, behind a numbers guard** | prose only |
+| writing the headline and summary for one reader | **LLM, behind two guards** | prose only |
 
-The boundary is enforced in code rather than by convention. Proposed checks are
-constructed with `decisive=False` — the field `controls.score_n` reads to zero out N —
-and are never passed to it. `test_the_lane_cannot_change_a_single_score` asserts that
-every score is byte-identical with the lane on and off.
+The boundary is enforced in code rather than by convention. Proposed checks are constructed
+with `decisive=False` — the field `controls.score_n` reads to zero out N — and are never
+passed to it. `test_the_lane_cannot_change_a_single_score` asserts every score is identical
+with the lane on and off.
 
-**Three guards, each of which reports what it caught.** Proposals naming a dimension
-value, metric or template that does not exist are rejected *before* becoming a query,
-and the count is shown ("4 accepted, 2 rejected by validation"). The narrator is given
-every figure it may use, and any number in its prose that was not in that corpus
-discards the narration wholesale in favour of the deterministic template — the page says
-so when it happens. A vendor outage is reported as an outage, never as "nothing found".
+**Two guards, each of which reports what it caught.** Proposals naming a dimension, metric or
+template that doesn't exist are rejected *before* becoming a query, and the count is shown
+("5 accepted, 1 rejected by validation"). The narrator is handed every figure it may use: any
+number in its prose that wasn't in that set discards the narration for the deterministic
+template, as does any claim that something *caused* the movement. The page says so when it
+happens.
 
-The ⏱ **Telemetry** panel puts the accounting on the page:
+The ⏱ **Telemetry** panel puts the accounting on screen: **1.3 s** per diagnosis, **89**
+registered queries executed, **41** served from cache, and **22** distinct `query_id`s a
+reader can replay directly from the card. Two of those numbers deserve their distinction —
+89 is what the diagnosis cost to produce, 22 is how much of it you can audit, and reporting
+the smaller one as "queries" would understate the work fourfold in the one panel whose job is
+honest accounting.
 
-| stage | ms | share |
-|---|---:|---:|
-| **drill** | 799.0 | **62%** |
-| rank | 390.1 | 30% |
-| detect | 71.6 | 6% |
-| seasonal | 16.8 | 1% |
-| symptoms | 15.4 | 1% |
-| narrate | 0.9 | 0% |
-| **total** | **1,293 ms** | |
+**The zero, priced.** With the lane off, a diagnosis costs **$0.0000**. Turned on, it makes
+three calls on `gemini-2.5-flash` — roughly **$0.0048** — and changes none of the numbers
+above. Switching to `claude-sonnet-5` costs about $0.024 and requires no source change.
 
-| | count |
-|---|---:|
-| registered queries executed | **89** |
-| …served from cache | 41 |
-| **distinct `query_id`s replayable on the card** | **22** |
-| **LLM calls / tokens / cost** | **0 / 0 / $0.0000** |
-
-Two of those numbers deserve their distinction. **89** is what the diagnosis cost to
-produce; **22** is how much of it a reader can audit. Reporting the smaller one as
-"queries" would understate the work by roughly 4×, in the one panel whose whole job is
-honest cost accounting — so both are shown, under names that cannot be confused.
-Metadata lookups (`dim_universe`, `events`) are counted in neither: they carry no
-user-facing number and therefore no `query_id`.
-
-**The zero, priced.** That row is the *default* state, with the investigator lane
-switched off. Turned on, it makes three calls per diagnosis on `gemini-2.5-flash` —
-roughly 6k input and 1.2k output tokens, about **$0.0048** at $0.30 / $2.50 per MTok
-(`GEMINI_API_KEY`). Switching to `claude-sonnet-5` via `LEDGERLENS_LLM_PROVIDER=anthropic`
-costs about **$0.0240** at $2.00 / $10.00 per MTok and requires no source change. Either
-way it adds checks and rewrites prose, and changes **none of the numbers above**.
-
-Telemetry is one of exactly **two** numbers on the page that carry no `query_id` — the
-other is the redaction notice. Both are facts about the *process* rather than the data,
-and the UI says so rather than leaving a gap to be noticed. Full reasoning in
+Telemetry is one of exactly **two** figures on the page without a `query_id` — the other is
+the redaction notice. Both are facts about the *process* rather than the data, and the UI
+says so rather than leaving a gap to be noticed. Full reasoning in
 [`docs/telemetry_decisions.md`](docs/telemetry_decisions.md).
 
 ---
 
-## What the demo shows
+## Why the demo can be trusted
 
-The synthetic data has known ground truth, so the ranking can be *proven* right rather than merely look plausible.
+The dataset is synthetic **so that the right answer is known in advance** — 122,562 daily
+facts across 99 slices and 18 months, generated from a fixed seed, with the true cause
+recorded in `ground_truth.json`. That means the ranking can be *checked*, not just admired.
 
 - **True cause:** `deploy_sepa_v214` — a SEPA connector release on Aug 3 that collapses renewals for `DACH × Enterprise × sepa` to 15% of baseline. Aggregate impact −8.2%.
 - **Decoy #1:** `campaign_dach_cut` — a DACH marketing budget cut two days earlier. Temporally *more* plausible than most candidates, region-overlapping, and completely innocent of this anomaly.
 - **Decoy #2:** `pricing_us_q3` — eliminated by empty cohort intersection before it can be scored at all.
-
-The result:
-
-| | T | C | D | N | **total** | |
-|---|---|---|---|---|---|---|
-| `deploy_sepa_v214` | 1.00 | **0.333** | 0.50 | 1.00 | **0.700** | 4/4 controls pass |
-| `deploy_dunning_v3` | 0.26 | 0.091 | 0.50 | 1.00 | 0.443 | |
-| `deploy_billing_ui_v9` | 0.14 | 0.030 | 0.50 | 1.00 | 0.393 | |
-| `flag_sepa_retry_beta` | 0.00 | 0.111 | 0.50 | 1.00 | 0.383 | enabled *after* onset |
-| `campaign_dach_cut` | 0.72 | 0.143 | 0.50 | **0.00** | 0.322 | **REJECTED** |
 
 **How the decoy dies.** Its blast radius covers all of DACH — 21 slices — against a 3-slice anomaly, so **C** is 0.143 versus the deploy's 0.333. Then the control finishes it: *if this were a DACH-wide demand shock, DACH Mid and SMB renewals on the same rail should have dropped too.* They came in at **−1.3%**, flat. That is a decisive failure, **N** goes to zero, and the hypothesis is rejected outright rather than merely outranked.
 
@@ -513,52 +491,110 @@ The result:
 
 ## Design notes worth knowing
 
-**Two baselines, deliberately.** `scan_for_onset` uses a cheap trailing rolling median to find *where* it broke; `evaluate` fits a Theil–Sen model on the pre-window only and freezes it across the anomaly window to measure *how big* it is. Using the trailing median to measure would be a real bug: by the end of a 14-day window half the trailing 28 days are themselves anomalous, the baseline sags toward the new regime, and the reported delta shrinks from −8.2% to about −6.6%.
+**Two baselines, on purpose.** A cheap trailing median finds *where* the metric broke; a
+Theil–Sen fit on the pre-window only, frozen across the anomaly, measures *how big* it is.
+Measuring with the trailing one would let the anomaly drag its own baseline down and shrink
+the reported damage by roughly a fifth.
 
-**The pre-window must exclude the anomaly.** If median and MAD are taken over the window itself, every day in it is ~85% low, the residual median moves with them, and z collapses toward zero — the anomaly quietly defines its own normal. `test_anomaly.py::test_mad_must_come_from_the_pre_window` asserts exactly this contrast.
+**The baseline never includes the anomaly.** Otherwise every day in the window is 85% low,
+"normal" moves with it, and the signal cancels itself out.
+`test_anomaly.py::test_mad_must_come_from_the_pre_window` holds that line.
 
-**Detection is advisory, not gating.** `pipeline.run(cohort=..., window=...)` bypasses the detector entirely and runs the same downstream chain. Every detection blind spot — slow drifts, ratio metrics, interaction effects, offsetting regional moves that cancel at the root — becomes "we don't auto-surface this" rather than "we can't diagnose this."
+**Detection is advisory, never gating.** Point the pipeline at a cohort and window directly
+and the same chain runs — so a blind spot in detection means "we don't auto-surface this"
+rather than "we can't diagnose this."
 
-**Multiple testing.** Benjamini–Hochberg runs across each drill-down level at q=0.10 and is recorded per node, but it never filters. Sibling slices are subsets of one parent and therefore positively dependent, which makes BH's guarantee approximate here; it is a principled sanity check on branch selection, and the negative controls — which need no distributional assumption — carry the actual rigor.
+**Support tickets corroborate; they never score.** The 42-ticket `ERR_SEPA_504` spike is
+attached as evidence and kept out of the rubric, because its cohort fit measures the same
+thing **C** already does.
 
-**Symptoms corroborate; they never score.** The 42-ticket `ERR_SEPA_504` spike attaches to the hypothesis as evidence but is excluded from the rubric, because its cohort fit measures the same signal **C** already does and scoring both would double-count it.
+**Determinism.** `SEED = 20260815` throughout, and the generator solves its scaling constants
+in closed form rather than hand-tuning an RNG — so the demo lands on the same numbers on any
+machine.
 
-**Determinism.** `SEED = 20260815` throughout, and the generator solves its two scaling constants in closed form against realized window sums rather than hand-tuning an RNG — so the aggregate delta lands on −8.17% by construction, not by luck.
+Full reasoning for every subsystem lives in [`docs/`](docs/README.md), one decision record
+per component.
+
+---
+
+## What each score actually means
+
+The five components are printed on every hypothesis card, and each answers a specific
+question. Knowing what they measure is what makes a ranking arguable rather than magic.
+
+**We rank evidence; we don't claim proof of cause.** With a single incident there's no
+population to estimate an effect over, so a tool promising "causal inference" here would be
+overselling. What you get instead is ranked, auditable evidence *plus the test that would
+settle it* — which is what it takes to act.
+
+| Component | What it really measures | Worth knowing |
+|---|---|---|
+| **T** temporal | The change started shortly before the metric broke | Precedence is necessary for causation, never sufficient |
+| **C** cohort match | Row-level Jaccard between the change's declared blast radius and the affected cohort | A wide radius scores badly even if the change *was* the cause |
+| **D** dose–response | Rank correlation of exposure against impact across sub-slices | Neutral at 0.5 here: both candidates fully contain the affected group, so exposure has no variance to correlate against. The ranking is carried by C and N, and the card says so |
+| **N** negative controls | Fraction of falsifiable predictions that held up | A passing control is a failure to falsify, not a confirmation |
+| **P** learned prior | Beta-Bernoulli mean over past analyst verdicts | Starts flat at 0.5 and only sharpens ranking; it never gates |
+
+Three things worth stating plainly:
+
+- **The −$416,144 figure is a measured shortfall against a deseasonalized baseline** — what the cohort earned versus what its own history predicted. A confidence interval around it is Phase 1 work; we report what we measured.
+- **The segment-siblings check encodes a mechanism assumption, deliberately.** It fires only for demand-side changes: a regional ad cut has no way to spare Mid-market and SMB customers in that region, whereas a code release targets a *code path*, and enterprise direct debit is a distinct one. That distinction is what lets the check kill the decoy without also killing the true cause.
+- **Detection is scoped to drops**, the direction a business acts on. Flagging increases as well needs a calendar-aware baseline so quarter-end spikes don't fire every quarter — that's Phase 1.
+
+**And when it genuinely can't explain something, it says so** — see *When it doesn't know* above.
+
+---
 
 ---
 
 ## Layout
 
 ```
-config.py                     constants, weights, thresholds, SEED
-app.py                        Streamlit UI
+config.py                 constants, weights, thresholds, SEED
+app.py                    the Streamlit UI
 ledgerlens/
-  models.py                   Pydantic contracts + the cohort algebra
-  store.py                    DuckDB lifecycle + query registry
-  gen_data.py                 synthetic generator (writes ground_truth.json)
-  anomaly.py                  detection, measurement, drill-down, BH
-  ledger/connectors.py        deterministic event ingestion
-  ledger/symptoms.py          ticket clustering
-  hypothesis.py               candidates + five-component scoring
-  controls.py                 negative control generation and evaluation
-  learning.py                 Beta-Bernoulli priors
-  narrate.py                  template narrator + guarded LLM narration
-  llm.py                      provider seam: gemini + anthropic adapters
-  investigator.py             the LLM lane: proposed checks, unverified causes, guard
-  pipeline.py                 orchestration
-tests/                        343 tests; test_pipeline.py is the acceptance test
-docs/
-  how_it_works.md             start here if the vocabulary is new
-  ai_decisions.md             the LLM lane, end to end
-  *_decisions.md              why each subsystem is built the way it is
-  design/                     the original build contract + architecture rationale
-  taskflow/                   the plans these were built from, kept as history
+  contracts.py            KPI semantic contracts: thresholds, lineage, access
+  store.py                DuckDB lifecycle + the query registry
+  gen_data.py             seeded synthetic generator
+  anomaly.py              detection, measurement, drill-down
+  ledger/                 change-event ingestion + ticket clustering
+  hypothesis.py           candidates and five-component scoring
+  controls.py             negative control generation and evaluation
+  narrate.py              template narrator + guarded LLM narration
+  llm.py                  provider seam: gemini + anthropic
+  investigator.py         the LLM lane and its guards
+  pipeline.py             orchestration
+tests/                    343 tests; test_pipeline.py is the acceptance test
+docs/                     one decision record per subsystem
 ```
 
-Deviations from [`docs/design/IMPLEMENTATION_SPEC.md`](docs/design/IMPLEMENTATION_SPEC.md) are marked `# SPEC-GAP:` at the point of departure, with the reason. The substantive ones are the three control-rule fixes described above and the practical-significance gate (`MIN_ABS_DELTA_PCT`) that makes the "no false flag before the incident" test deterministic rather than a coin flip.
+Every file is annotated in [`study_guide.md`](study_guide.md), which also gives a reading
+order. Deviations from the original build contract are marked `# SPEC-GAP:` in the source, at
+the point of departure, with the reason.
 
-## Not built in this cut
+---
 
-Per the spec's own MVP path: `effect.py` (diff-in-differences with bootstrap CI), `ambiguity.py` (the discriminating test), the confirm/reject learning loop in the UI, and the bounded `explore` pass.
+## Roadmap
 
-**`ledger/normalizer.py` — the LLM event normalizer — is deliberately cut rather than merely unbuilt.** It is the one call site of the four that is *not* additive: the spec has it multiply a hypothesis score by an LLM-emitted extraction confidence, which puts a model on the ranking path and contradicts the property every other part of this design protects. Its schema (`models.ExtractedSignal`) and fields (`ChangeEvent.extraction`, `.confidence`) stay declared as the honest record of a deferred decision. Reasoning in [`docs/ai_decisions.md`](docs/ai_decisions.md) D2.
+Named here because a gap you can point at beats one a reader finds.
+
+**Phase 1 — rigour.** `effect.py` for difference-in-differences with a bootstrap interval;
+a calendar-aware baseline so detection can run in both directions; `ambiguity.py` to name the
+single query that separates two near-tied candidates.
+
+**Phase 2 — enterprise integration.** Real connectors in place of the synthetic fixtures —
+GitHub, LaunchDarkly, Jira, Zendesk, campaign calendars — executing warehouse-native against
+Snowflake, Databricks or BigQuery, since the engine is already just SQL. SSO and per-user
+verdict attribution.
+
+**Deliberately deferred: `ledger/normalizer.py`,** the LLM event normalizer. It is the one
+call site of the four that isn't additive — the original spec has it multiply a hypothesis
+score by a model-emitted confidence, which would put a model on the ranking path and undo the
+property everything else here protects. Its schema stays declared as the honest record of a
+decision taken rather than a corner cut. Reasoning in
+[`docs/ai_decisions.md`](docs/ai_decisions.md).
+
+---
+
+*Questions, or want the guided tour? Start with [`docs/how_it_works.md`](docs/how_it_works.md)
+— it assumes nothing and explains everything.*
