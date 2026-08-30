@@ -17,3 +17,7 @@ details/
 # Superseded by taskflow/taskflow.md, which was written against the repo as it
 # actually stands. Kept locally for reference only.
 improvements.md
+
+# Submission inputs: local until you fill them (team name, video URL)
+submission/.team_name
+submission/.video_url

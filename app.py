@@ -395,8 +395,8 @@ for n in card.nodes:
         {
             "depth": n.depth,
             "cohort": cohort_label(n.cohort),
-            "delta %": round(n.delta_pct, 2),
-            "shortfall": round(n.delta_abs),
+            "delta %": f"{n.delta_pct:+.2f}",
+            "shortfall": money(n.delta_abs),
             "contribution": round(n.contribution, 3),
             "z": round(n.residual_z, 1),
             "rows/day": n.rows_per_day,
@@ -494,7 +494,7 @@ def render_hypothesis(h, rank: int | None, rejected: bool) -> None:
                         "control": c.name,
                         "rule": c.rule,
                         "prediction": c.prediction.replace("_", " "),
-                        "observed %": round(c.observed_delta_pct, 2),
+                        "observed %": f"{c.observed_delta_pct:+.2f}",
                         "decisive": "◀ killed it" if c.decisive else "",
                     }
                     for c in h.controls
