@@ -30,8 +30,17 @@ explanation** that a human under time pressure would likely have acted on.
 |---|---|
 | Time to a defensible diagnosis | **~3 analyst-days → 1.3 seconds** |
 | Numbers a reader can replay | **22 distinct `query_id`s** on one card |
+| Documented value per customer, per year | **~$205,000** — recovered analyst capacity plus one avoided misattribution |
+| Cost to serve one customer, per year | **under $1** in model spend; the engine runs on the client's own warehouse |
 | LLM cost per diagnosis | **~$0.0048** (Gemini Flash), **$0.0000** with the AI lane off |
-| Cost of the wrong call it prevents | the **−$410k** leak that stays open while you cut marketing |
+
+**The commercial shape follows from the technical one.** Because the ranking path is
+deterministic SQL rather than inference, marginal cost is close to zero and does not grow
+with usage — the opposite of a design that calls a model for every question. At a licence
+priced near a quarter of documented value, the customer sees a **4× first-year return** on a
+number they can audit themselves, and the margin behaves like classic software rather than
+like AI tooling. Sections 4.5–4.8 set out the unit economics, pricing, adoption scenarios and
+what compounds.
 
 ---
 
@@ -299,7 +308,7 @@ capacity, redirected from evidence assembly to judgement. Real, but the smaller 
 **Wrong-action avoidance — the larger half.** In the reference incident the two costs of
 acting on the decoy compound:
 
-- The **−$410k** renewals leak stays open for however long the wrong fix is given to work.
+- The **−$416,144** renewals leak stays open for however long the wrong fix is given to work.
 - The campaign cut is reversed on a false premise, when the controls show it *did* cause a
   genuine ~31% new-logo drop — a real finding about a different metric.
 
@@ -331,7 +340,89 @@ metadata to blast radius. A deploy already knows its rollout regions, a feature 
 its targeting rules, a campaign knows its geo, a ticket knows its account and the account
 knows its segment. **The linkage is already recorded; it does not need to be inferred.**
 
-### 4.5 Delivery shape
+### 4.5 What it costs to serve — and why the margin is unusual
+
+The measured figures in §4.3 have a commercial consequence worth stating plainly, because it
+is the most attractive property of this design and it was not designed for that reason.
+
+| Cost line | Per customer, per year | Why |
+|---|---|---|
+| Model spend | **under $1** | ~40 diagnoses × $0.0048, and $0 with the lane off |
+| Compute | **the customer's own** | The engine is SQL. It executes warehouse-native against Snowflake, Databricks or BigQuery — there is no second copy of the data and no cluster to run |
+| Dedicated infrastructure | **none** | No graph database, no vector store, no agent orchestrator, no GPU |
+| Support, updates, rule-library maintenance | the real cost | Human, and shared across every customer |
+
+**Almost all marginal cost in this category is inference and infrastructure, and this design
+has close to neither.** A competitor that puts an LLM on the ranking path pays for a model
+call on every question, at every scale, forever. We pay for one only when a reader asks for
+extra checks or nicer prose — and can turn it off entirely without losing a number.
+
+The result is a gross margin that behaves like classic software rather than like AI
+tooling — and it *improves* with scale, because the expensive part (the negative-control
+rule library) is written once and shared by every deployment.
+
+### 4.6 Pricing, anchored to measured value
+
+Two revenue lines, because this lands as both an engagement and an asset.
+
+**1. Implementation.** The connector mapping is the deliverable (§4.9) — client-specific
+configuration, not custom engineering. A 6–8 week shape for a first KPI family, with each
+additional source measured in days.
+
+**2. Annual platform licence**, priced against documented value rather than seat count:
+
+| | Per customer, per year |
+|---|---|
+| Analyst capacity recovered (§4.2) | ~$55,000 |
+| Expected value of misattribution avoided | conservatively ~$150,000 — one incident a year at a fraction of the reference incident's $416k |
+| **Documented annual value** | **~$205,000** |
+| **Licence at 20–25% of value captured** | **~$45,000 – $50,000** |
+
+That leaves the customer a **4× first-year return** on a number they can audit themselves,
+which is the easiest procurement conversation available. And because the value scales with
+the number of KPIs under management rather than with users, expansion inside an account is a
+configuration change rather than a new sale.
+
+*These are planning figures for sizing, not quoted prices. The value inputs are the §4.1
+assumptions; the capture ratio is a standard enterprise-software heuristic.*
+
+### 4.7 What the opportunity looks like at scale
+
+Rather than claim a share of a large market, here is the arithmetic at three adoption levels
+inside a systems integrator's existing client base. A qualifying client is one with a data
+warehouse, three or more tracked KPIs, and an analytics or revenue-operations function —
+which describes most subscription and transaction-driven businesses above roughly $20M
+revenue.
+
+| | Clients live | Recurring licence ARR | Implementation, new clients that year |
+|---|---:|---:|---:|
+| **Pilot year** | 10 | ~$0.5M | ~$1.2M (10 × ~$120k) |
+| **Established** | 50 | ~$2.4M | ~$2.4M (20 × ~$120k) |
+| **At scale** | 150 | ~$7.1M | ~$3.6M (30 × ~$120k) |
+
+At the "established" line, recurring revenue passes one-off revenue — the point at which this
+stops being a service line and starts being an asset. The engineering required to get from 10
+to 150 clients is connector coverage, not new science: the engine is unchanged, and every
+rule added for one client is available to all of them.
+
+### 4.8 Why a follower cannot simply copy it
+
+Three things compound, and none of them is the algorithm:
+
+- **The negative-control rule library.** Each rule encodes a falsifiable mechanism assumption
+  that a domain expert argued for. Five ship today; every incident investigated is a candidate
+  for a sixth, and each one improves every deployment at once.
+- **The verdict corpus is per-tenant and cumulative.** Analyst confirmations sharpen a
+  client's own prior, and that history does not transfer to a competitor's tool. Switching
+  cost accrues without lock-in tactics.
+- **The connector mappings are the integration surface.** Once a client's deploy, flag,
+  campaign and ticket metadata is mapped to blast-radius predicates, that mapping is the
+  asset — and it is the part a rival would have to rebuild client by client.
+
+The architecture itself is publishable, and this document publishes it. The defensibility is
+in what accumulates on top.
+
+### 4.9 Delivery shape
 
 **This is an engagement, not a product install** — which is what makes it a reusable asset
 rather than a one-off build.
@@ -354,7 +445,7 @@ Three properties make it land inside an enterprise rather than beside one:
   names the feed it is missing. A pilot that says *"I cannot explain this yet, connect
   GitHub"* is a pilot that survives its first surprise.
 
-### 4.6 How we would know it is working
+### 4.10 How we would know it is working
 
 The feedback loop already collects the product's own success metric: analyst verdicts are
 rows in a table, so confirmation rate is a query rather than a survey.
