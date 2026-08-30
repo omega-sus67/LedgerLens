@@ -1,12 +1,18 @@
 # Demo Video — Narration Script
 
-**Timed against the actual recording:** `LedgerLens_demo.mp4`, **5:45**, 1600×1000, silent
+**Timed against the actual recording:** `LedgerLens_demo.mp4`, **5:50**, 1600×1000, silent
 screen capture. Every timestamp below was read off that file frame by frame, not planned —
 so you can narrate straight over it without touching the picture.
 
 Delivery: **~150 words per minute**. Each beat carries a word budget; staying inside it is
 what keeps you in sync. Where a beat runs long the picture holds still, so you have room
 rather than pressure.
+
+**The video points for you.** A screen recording has no cursor, so the page highlights its
+own targets: at the moment listed under each beat, a red ring appears around the thing being
+discussed and the rest of the page dims. You never have to say "over here on the left" —
+just talk, and the ring will be there. Every timestamp below was measured by the recorder
+itself, not estimated from frames.
 
 Figures are guarded by [`tests/test_demo_script.py`](../tests/test_demo_script.py) against a
 live diagnosis. **If the app and this script disagree, the suite goes red before you record.**
@@ -28,10 +34,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 
 ---
 
-## Beat 1 — The wedge (0:00–0:30) · ~77 words
+## Beat 1 — The wedge (0:00–0:29) · ~77 words
 
 **On screen:** headline, four metric tiles, seasonality line.
-**Point at:** the headline, then the four tiles left to right.
+**The video highlights it for you:** **0:15** — the *Focal cohort* tile
 
 > "Your dashboard says renewals dropped eight percent. It won't tell you why. Finding that
 > out takes an analyst about three days.
@@ -46,10 +52,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > **Technique —** Framing. The scale line is four seconds that permanently retires the
 > "is this a toy?" question.
 
-## Beat 2 — Decomposed, then drilled (0:31–1:00) · ~80 words
+## Beat 2 — Decomposed, then drilled (0:30–1:01) · ~80 words
 
 **On screen:** the Attribution table.
-**Point at:** the seasonality line, then the `◀ focal` row on the bottom line of the table.
+**The video highlights it for you:** **0:44** — the `◀ focal` row
 
 > "Renewals are down eight point three percent. Some of that's just August — it's always
 > slower. We measured that from the same customers a year ago, so it's not a guess. Take it
@@ -63,11 +69,11 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > Benjamini–Hochberg across drill levels — the `BH` column. Robust estimators *because* a
 > mean-based detector lets the outlier inflate its own definition of normal.
 
-## Beat 3 — The decoy dies ★ (1:01–1:40) · ~106 words
+## Beat 3 — The decoy dies ★ (1:02–1:43) · ~106 words
 
 **The forty seconds that win this. Slow down.**
 **On screen:** the rejected card and its five-rule control table.
-**Point at:** the red REJECTED banner → the **N** bar sitting at zero → the pink R2 row.
+**The video highlights it for you:** **1:14** — the red REJECTED banner · **1:28** — the pink `R2 segment-siblings` row
 
 > "Now the interesting part. Marketing cut their German ad budget one day before renewals
 > fell. One day. That looks guilty — and most tools would blame it.
@@ -86,10 +92,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > R2 segment-siblings, R3 geo-complement, R4 objective-mismatch, R5 temporal-placebo. A rule
 > you can *name* is one a domain expert can argue with. A learned weight isn't.
 
-## Beat 4 — Innocent here, guilty there (1:41–2:01) · ~54 words
+## Beat 4 — Innocent here, guilty there (1:44–2:04) · ~54 words
 
 **On screen:** the evidence chain, then Recommended actions.
-**Point at:** the `[P2]` action and the `basis:` query id beneath it.
+**The video highlights it for you:** **1:51** — the `[P2]` action's `new_logo_bookings -31.0%` basis
 
 > "And here's where it gets useful.
 >
@@ -101,11 +107,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > **Technique —** Business rules. R4 objective-mismatch produces both findings from a single
 > check. Every action carries `basis:` — a replayable query, not an assertion.
 
-## Beat 5 — The model proposes, the engine disposes ★ (2:02–2:35) · ~92 words
+## Beat 5 — The model proposes, the engine disposes ★ (2:05–2:38) · ~92 words
 
 **On screen:** the 🤖 investigator lane — proposed-checks table, then unverifiable causes.
-**Point at:** the `verdict` column → the "accepted / rejected by validation" line → the
-`query_id` column.
+**The video highlights it for you:** **2:20** — the *5 accepted, 1 rejected by validation* line
 
 > "Now the AI — and notice where it sits. After the answer, not before it.
 >
@@ -122,10 +127,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > checks are built `decisive=False` and never reach `controls.score_n` — a test asserts every
 > score is byte-identical with this lane on or off.
 
-## Beat 6 — Two guards, not one ★ (2:36–3:00) · ~67 words
+## Beat 6 — Two guards, not one ★ (2:39–3:03) · ~67 words
 
 **On screen:** the unverifiable-causes panel, then back to the headline.
-**Point at:** the "would need / would test" lines, then the headline itself.
+**The video highlights it for you:** **2:39** — the green numbers-guard banner, immediately
 
 > "It also lists things that might be the cause but we can't check — and names the system
 > you'd need to find out.
@@ -139,10 +144,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > **Technique —** LLM behind deterministic guards. This is the beat that answers *"the LLM
 > must not be the source of quantitative truth"* — enforced in code, not requested in a prompt.
 
-## Beat 7 — One computation, three readers (3:01–3:23) · ~55 words
+## Beat 7 — One computation, three readers (3:04–3:27) · ~55 words
 
 **On screen:** CFO headline (3:01–3:11), then On-Call headline (3:12–3:23).
-**Point at:** each headline as it changes. **Do not touch Growth here** — that is beat 8.
+**The video highlights it for you:** none — the headline changing *is* the point (CFO 3:04, On-Call 3:16)
 
 > "Same findings, different people. The finance lead gets the money and the forecast risk —
 > and a note to escalate, not an instruction to roll back a release, because that isn't their
@@ -155,10 +160,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > **Technique —** Deterministic rendering. Persona sits downstream of every query and
 > structurally cannot reach one. Decision rights are mechanical, not cosmetic.
 
-## Beat 8 — Redaction that names itself (3:24–3:51) · ~74 words
+## Beat 8 — Redaction that names itself (3:28–3:56) · ~74 words
 
 **On screen:** Growth Marketing — the 🔒 banner, and changed numbers.
-**Point at:** the banner's policy id → the focal cohort → the headline percentage.
+**The video highlights it for you:** **3:39** — the 🔒 *Restricted view* banner
 
 > "Marketing sees a different version — and not because we softened it. They're not allowed
 > to see payment data, so the tool genuinely can't split the numbers that way for them.
@@ -172,11 +177,10 @@ deciding (2:02)**, and **the refusal (4:20)**.
 > **Technique —** Business rules, enforced at exactly one chokepoint. And the banner never
 > *counts* what it hides — that would mean computing the answer the reader isn't entitled to.
 
-## Beat 9 — It declines to detect (3:52–4:19) · ~77 words
+## Beat 9 — It declines to detect (3:57–4:25) · ~77 words
 
 **On screen:** `payment_success_rate` — the banner sits **above** the title.
-**Point at:** the banner → the pre-filled window controls → the ratio caption under
-Attribution. **Don't scroll into the hypothesis list on this KPI.**
+**The video highlights it for you:** **4:07** — the *Insufficient history* banner
 
 > "Third metric, awkward on purpose. It launched in June — under two months of
 > history. Not enough to know what normal looks like. So it refuses to guess, and says why.
@@ -191,10 +195,10 @@ Attribution. **Don't scroll into the hypothesis list on this KPI.**
 > contract, not a constant in the engine. No seasonality is claimed: this KPI has no prior
 > August.
 
-## Beat 10 — When it doesn't know, it says so ★ (4:20–4:51) · ~84 words
+## Beat 10 — When it doesn't know, it says so ★ (4:26–4:56) · ~84 words
 
 **On screen:** abstention headline (4:20–4:37), then the diagnosis text (4:38–4:51).
-**Point at:** the headline → the connected / not-connected source list.
+**The video highlights it for you:** **4:32** — the refusal headline (source list from 4:43)
 
 > "Last one, and it's my favourite. Pretend we never connected the system that tracks code
 > releases.
@@ -210,10 +214,10 @@ Attribution. **Don't scroll into the hypothesis list on this KPI.**
 > **Technique —** Deterministic set logic, applied at candidate generation. Filtering later
 > would model *"we saw it and dismissed it"* — a different and less honest scenario.
 
-## Beat 11 — A prior you can delete (4:52–5:09) · ~45 words
+## Beat 11 — A prior you can delete (4:57–5:14) · ~45 words
 
 **On screen:** the top hypothesis after a 👍.
-**Point at:** **the score** — it reads `0.708`, not `0.700` — then the **P** component.
+**The video highlights it for you:** **4:57** — the score, reading `0.708`
 
 > "An analyst confirms it — watch the score tick up.
 >
@@ -224,10 +228,10 @@ Attribution. **Don't scroll into the hypothesis list on this KPI.**
 > **Technique —** Statistics — Beta–Bernoulli, derived from rows rather than kept as state.
 > That `0.008` shift is the entire influence this loop is permitted.
 
-## Beat 12 — The split, precisely (5:10–5:45) · ~102 words
+## Beat 12 — The split, precisely (5:15–5:50) · ~102 words
 
 **On screen:** ⏱ Telemetry — four tiles, the stage table, the *LLM vs non-LLM* paragraph.
-**Point at:** "Queries executed 89" → "Replayable on this card 22" → the LLM cost tile.
+**The video highlights it for you:** **5:27** — *Replayable on this card: 22*
 *Read the counts off the screen; they move as features land.*
 
 > "So here's the honest accounting — on the page, not in a slide.
