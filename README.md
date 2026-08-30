@@ -43,7 +43,7 @@ uv venv --python 3.12
 uv pip install --python .venv/bin/python duckdb pandas pyarrow numpy scipy statsmodels pydantic streamlit plotly anthropic pytest
 
 .venv/bin/python -m ledgerlens.gen_data    # writes data/*.parquet, *.json, ground_truth.json
-.venv/bin/python -m pytest -q              # 209 tests
+.venv/bin/python -m pytest -q              # 216 tests
 .venv/bin/python -m ledgerlens.pipeline    # prints the diagnosis card to stdout
 .venv/bin/python -m streamlit run app.py   # the analyst UI
 ```
@@ -318,7 +318,7 @@ ledgerlens/
   learning.py                 Beta-Bernoulli priors
   narrate.py                  template narrator
   pipeline.py                 orchestration
-tests/                        209 tests; test_pipeline.py is the acceptance test
+tests/                        216 tests; test_pipeline.py is the acceptance test
 ```
 
 Deviations from `IMPLEMENTATION_SPEC.md` are marked `# SPEC-GAP:` at the point of departure, with the reason. The substantive ones are the three control-rule fixes described above and the practical-significance gate (`MIN_ABS_DELTA_PCT`) that makes the "no false flag before the incident" test deterministic rather than a coin flip.

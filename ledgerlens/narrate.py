@@ -11,6 +11,7 @@ SQL that produced it.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -170,9 +171,37 @@ def narrate(
 ) -> DiagnosisCard:
     who = persona or personas.get(personas.DEFAULT_PERSONA_ID)
     abstain = payload.no_confident_cause if no_confident_cause is None else no_confident_cause
-    if abstain or not payload.ranked:
-        return _no_cause_card(payload, who)
-    return _cause_card(payload, who)
+
+    start = time.perf_counter()
+    card = (
+        _no_cause_card(payload, who)
+        if (abstain or not payload.ranked)
+        else _cause_card(payload, who)
+    )
+    narrate_ms = (time.perf_counter() - start) * 1000
+
+    if payload.telemetry is None:
+        return card
+
+    # Both of these need the FINISHED card: queries_on_card counts its ids, and the
+    # narration timing is not knowable until narration is done. Set once, here, so
+    # both the cause and no-cause branches are covered from one place.
+    #
+    # This is narration counting its OWN OUTPUT, not narration computing a number
+    # about the data -- the rule it must never break is the second one.
+    #
+    # Imported inside the function on purpose: pipeline imports narrate at module
+    # level, so a top-level import here is a cycle. Mirrors _is_rate()'s lazy
+    # `from ledgerlens import contracts`.
+    from ledgerlens import pipeline as _pipeline
+
+    telemetry = payload.telemetry.model_copy(
+        update={
+            "queries_on_card": len(_pipeline.card_query_ids(card)),
+            "stage_ms": {**payload.telemetry.stage_ms, "narrate": narrate_ms},
+        }
+    )
+    return card.model_copy(update={"telemetry": telemetry})
 
 
 def _route(action: Action, who: personas.Persona) -> Action:
@@ -578,6 +607,7 @@ def _cause_card(payload: NarrationPayload, who: personas.Persona) -> DiagnosisCa
         seasonal_query_id=payload.seasonal_query_id,
         no_confident_cause=False,
         redactions=payload.redactions,
+        telemetry=payload.telemetry,
     )
 
 
@@ -643,4 +673,5 @@ def _no_cause_card(payload: NarrationPayload, who: personas.Persona) -> Diagnosi
         seasonal_query_id=payload.seasonal_query_id,
         no_confident_cause=True,
         redactions=payload.redactions,
+        telemetry=payload.telemetry,
     )

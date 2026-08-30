@@ -117,3 +117,67 @@ def test_telemetry_is_per_diagnosis_not_since_boot(store):
     total_a = a.queries_executed + a.queries_cached
     total_b = b.queries_executed + b.queries_cached
     assert total_a == total_b, "counts accumulated instead of resetting per call"
+
+
+# ------------------------------------------------------ 6.3 telemetry on the card
+
+
+def test_the_card_carries_the_telemetry_the_payload_measured(store):
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    assert card.telemetry is not None
+    assert set(card.telemetry.stage_ms) >= DETECT_STAGES
+
+
+def test_narration_is_timed_as_its_own_stage(store):
+    """Narration is a real step a user waits through. Leaving it out would make the
+    panel's total quietly smaller than the wall clock they experienced."""
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    assert "narrate" in card.telemetry.stage_ms
+
+
+def test_queries_on_card_matches_the_provenance_audit(store):
+    """The provenance number, and it must equal what the audit actually finds --
+    otherwise the panel claims an auditability it cannot deliver."""
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    assert card.telemetry.queries_on_card == len(pipeline.card_query_ids(card))
+    assert card.telemetry.queries_on_card > 10
+
+
+def test_the_provenance_count_is_smaller_than_the_work_done():
+    """The correction that motivated this whole design: ~19 ids on the card against
+    ~86 registered queries executed cold. Reporting the former as 'queries' in a
+    runtime panel understates the work by roughly 6x. Both numbers are real; they
+    answer different questions and must never be merged into one field.
+
+    Opens its own store so the cache is genuinely cold -- the shared fixture is warm.
+    """
+    fresh = pipeline.get_store()
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=fresh)
+    t = card.telemetry
+    assert t.queries_on_card < t.queries_executed + t.queries_cached
+    fresh.close()
+
+
+def test_offline_path_makes_no_model_calls(store):
+    """The claim the whole README rests on, asserted rather than stated."""
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    t = card.telemetry
+    assert (t.llm_calls, t.llm_tokens, t.llm_cost_usd) == (0, 0, 0.0)
+    assert card.generated_by == "template"
+
+
+def test_every_persona_gets_the_same_zero(store):
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    for pid in ("analyst", "cfo", "oncall", "growth"):
+        card = narrate.narrate(payload, persona=personas.get(pid))
+        assert card.telemetry.llm_calls == 0
+
+
+def test_the_abstention_card_is_also_accounted_for(store):
+    """Abstaining is not free -- it costs the same drill and rank as answering. A
+    telemetry panel that went blank on the honest branch would imply otherwise."""
+    payload = pipeline.diagnose("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    card = narrate.narrate(payload, no_confident_cause=True)
+    assert card.no_confident_cause is True
+    assert card.telemetry is not None
+    assert card.telemetry.queries_on_card == len(pipeline.card_query_ids(card))
