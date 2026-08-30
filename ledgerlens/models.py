@@ -266,6 +266,24 @@ class EvidenceStep(BaseModel):
     observed: str
 
 
+class Redaction(BaseModel):
+    """A dimension withheld from this reader by policy.
+
+    Deliberately NOT an EvidenceStep: that model requires a `query_id`, and there is
+    no query behind a policy decision. Putting a provenance-free claim into the
+    evidence chain would break the one invariant this product rests on.
+
+    Carries the policy id and reason so the card can ATTRIBUTE the refusal rather than
+    merely perform it. Both strings are copied off the contract's `AccessRule`, never
+    retyped into narration -- see docs/roles_decisions.md D8.
+    """
+
+    model_config = ConfigDict(frozen=True)
+    dim: str
+    policy_id: str
+    reason: str
+
+
 class Action(BaseModel):
     """The brief's recommendation chain, in the brief's order:
 
@@ -312,6 +330,9 @@ class DiagnosisCard(BaseModel):
     seasonal_pct: float = 0.0
     seasonal_query_id: str = ""
     no_confident_cause: bool = False
+    # What policy withheld from this reader. Defaulted, so every existing
+    # construction site stays valid and an unrestricted card is simply empty.
+    redactions: list[Redaction] = []
 
     @staticmethod
     def no_anomaly(metric: str, as_of: date) -> "DiagnosisCard":

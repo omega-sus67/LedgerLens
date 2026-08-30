@@ -11,7 +11,7 @@ SQL that produced it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 import config
@@ -22,6 +22,7 @@ from ledgerlens.models import (
     DiagnosisCard,
     EvidenceStep,
     Hypothesis,
+    Redaction,
     SymptomCluster,
     cohort_label,
 )
@@ -77,6 +78,10 @@ class NarrationPayload:
     seasonal_pct: float
     seasonal_query_id: str
     no_confident_cause: bool = False
+    # Defaulted, and therefore must follow the other defaulted fields: dataclass
+    # ordering. Carried, never recomputed -- narration states the refusal, it does
+    # not decide it.
+    redactions: list[Redaction] = field(default_factory=list)
 
 
 def _money(x: float) -> str:
