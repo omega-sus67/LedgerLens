@@ -70,7 +70,7 @@ single one of them is fatal. The cut below follows that distinction.
 | 2 | A lightweight KPI or semantic contract covering definitions, calculations, drivers, thresholds, lineage and access restrictions | ✅ Task 1 |
 | 3 | At least two personas receiving different insight narratives or recommended actions | ✅ Task 2 — four |
 | 4 | One multi-factor KPI movement with known or simulated underlying drivers | ✅ seasonality + deploy + campaign decoy, decomposed on the card |
-| 5 | One low-confidence scenario in which the engine requests clarification or abstains | ✅ Task 3 declines detection and asks for a window · **hardened by Task 7** |
+| 5 | One low-confidence scenario in which the engine requests clarification or abstains | ✅ Task 3 declines detection and asks for a window · ✅ Task 7 makes the refuse-to-explain branch reachable from the sidebar |
 | 6 | One sparse-history or newly launched KPI scenario | ✅ Task 3 |
 | 7 | One role-based security or entitlement scenario | ✅ Task 4 — `fin.rail_detail` redacts the rail cut from `growth`, and the card names the policy |
 | 8 | Evidence showing source freshness, analytical method, contribution, confidence and lineage | ✅ Tasks 1 + 2 |
@@ -88,7 +88,7 @@ single one of them is fatal. The cut below follows that distinction.
 | ~~0~~ | ~~Merge, correct the claims, push~~ ✅ | the *repository* deliverable | done |
 | ~~4~~ | ~~Role-based entitlement~~ ✅ | MPE row 7 | done |
 | ~~6~~ | ~~Telemetry panel~~ ✅ | MPE rows 9 **and** 10 | done |
-| 7 | Abstention demo path | hardens MPE row 5 | 1h |
+| ~~7~~ | ~~Abstention demo path~~ ✅ | hardens MPE row 5 | done |
 | 12 | Submission package | proposal · video · README · repo | 4h |
 | 5 | Learning-loop UI *(conditional)* | Objective 7 — **only if 12 is done** | 2h |
 
@@ -362,7 +362,14 @@ it to make telemetry look good.
 
 ---
 
-## Task 7 — Abstention demo path
+## Task 7 — Abstention demo path ✅ **DONE**
+
+> **Landed 2026-08-30** on `task-7-abstention`. Decisions:
+> [`docs/abstention_decisions.md`](../docs/abstention_decisions.md). The sketch below is
+> right about the mechanism and the risk (the decoy does stay rejected, at 0.322), but
+> missed one thing: `_no_cause_card` hardcoded its connectivity prose, so the simulation
+> made the card claim github was connected while the demo said it was not. Connectivity
+> is now read off the contract's lineage.
 
 **Goal:** abstention **demonstrated**, not described. The code path exists and is
 already written well; there is simply no way to reach it without editing source.
@@ -568,7 +575,7 @@ RNG stream, so any new series needs its own `default_rng(SEED_*)`, and
 `tests/test_sparse_kpi.py`'s fingerprints must stay green. **If a fingerprint fails, fix
 the generator, never the hash.**
 
-**Test count is a claim.** 218 today. `tests/test_docs.py` fires on EVERY task that
+**Test count is a claim.** 229 today. `tests/test_docs.py` fires on EVERY task that
 adds tests, so update `README.md`'s number in the same commit -- otherwise every
 intermediate commit on a branch is red. Tasks 4, 6 and 7 all add tests. Task 0's
 `test_readme_test_count_is_true` makes drift a test failure instead of a credibility

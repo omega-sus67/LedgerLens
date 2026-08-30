@@ -17,17 +17,20 @@ deliberately; don't let this file duplicate or drift from it.
 
 ## Current state (as of 2026-08-29)
 
-- Deterministic core is done and stable: **218 tests passing**, decoy-rejection demo
+- Deterministic core is done and stable: **229 tests passing**, decoy-rejection demo
   works end-to-end, README's claims verified against the code.
-- **Tasks 1, 2, 3, 4 and 6 are done** (KPI semantic contract; personas + `Action`
-  reshape; third KPI with sparse history; role-based entitlement; telemetry panel).
+- **Tasks 1, 2, 3, 4, 6 and 7 are done** (KPI semantic contract; personas + `Action`
+  reshape; third KPI with sparse history; role-based entitlement; telemetry panel;
+  reachable abstention).
   Rationale for each lives in `docs/contracts_decisions.md`,
   `docs/persona_decisions.md`, `docs/sparse_kpi_decisions.md`,
-  `docs/roles_decisions.md` and `docs/telemetry_decisions.md`. 1-3 are merged to
-  `main`; 4 is on `task-4-entitlement`, 6 is stacked on it as `task-6-telemetry`.
-- **ALL TEN Minimum Prototype Expectation rows now close.** Task 6 closed the last two
-  (row 9, LLM vs non-LLM breakdown; row 10, runtime telemetry). Task 7 hardens row 5
-  but does not close a new one.
+  `docs/roles_decisions.md`, `docs/telemetry_decisions.md` and
+  `docs/abstention_decisions.md`. 1-3 are merged to `main`; **4, 6 and 7 are stacked
+  and unmerged**: `task-4-entitlement` -> `task-6-telemetry` -> `task-7-abstention`.
+- **ALL TEN Minimum Prototype Expectation rows close.** Task 6 closed the last two
+  (row 9, LLM vs non-LLM breakdown; row 10, runtime telemetry); task 7 hardened row 5
+  by making abstention reachable from the UI. **Only task 12 (submission package)
+  remains, and it is a deliverable rather than a feature.**
 - Confirmed via a genuine cold clone (`git clone` into `/tmp`, fresh venv, README's
   documented install steps only) that `gen_data.py` -> `pytest` -> `pipeline.py`
   reproduce the full diagnosis card with zero data files at checkout. `data/*` is
@@ -154,6 +157,31 @@ Closes MPE rows 9 and 10, which takes the checklist to ten of ten.
 - **`_Stopwatch.time` uses try/FINALLY.** The timing is recorded even when a stage
   raises, and the exception still propagates. Do not convert it to `except`.
 
+## Done: task 7 -- reachable abstention
+
+`_no_cause_card` was always well written and always unreachable without editing source.
+A sidebar switch now simulates the deploy connector never having been wired up.
+**Full rationale in [docs/abstention_decisions.md](docs/abstention_decisions.md).**
+
+- **The filter is at CANDIDATE GENERATION, not a score penalty.** An unconnected system
+  produces no rows, not a low-scoring candidate. Penalising later would model "we saw it
+  and dismissed it", and would leave `deploy_sepa_v214` on the card as a rejected
+  hypothesis -- exactly the wrong story.
+- **Fixed a real bug: `_no_cause_card` hardcoded its connectivity prose.** With github
+  dropped it printed "Connected sources: deploys (github)..." -- the card contradicting
+  the demo, in the branch whose whole purpose is honesty. Connectivity is now read off
+  `contract.lineage`; the "no feed exists" list off `contract.anticipated_event_types`.
+  Only the DISPLAY labels (`SOURCE_LABEL`) are local. **Never retype a connectivity
+  claim into narrate.py.**
+- **The decoy stays rejected when competition is removed** (0.322, killed by its own
+  segment-sibling control). That is load-bearing: a decoy promoted the moment rivals
+  vanish would mean the control was never doing the work.
+- **`drop_sources` is the THIRD cache-key input** after cohort/window and role. The
+  signature now scales; task 5's feedback would be the fourth.
+- **A system that shows less must say why.** Same principle as task 4's redaction
+  banner: the toggle is labelled, captioned while active, and the card names the feed it
+  is missing.
+
 ## Conventions this repo uses (learned, not to be reinvented)
 
 - **Every number traces to a query.** `Store.q()` is the only path to the
@@ -202,8 +230,8 @@ Closes MPE rows 9 and 10, which takes the checklist to ten of ten.
 ## Deadline context
 
 Submission: **2026-08-30**. The schedule is `taskflow/taskflow.md`'s task order. Tasks
-1-4 and 6 are done (4 and 6 unmerged, stacked). **All ten checklist rows close.** Task 7
-(reachable abstention) hardens row 5 and is cheap; task 12
+1-4, 6 and 7 are done (4, 6, 7 unmerged and stacked). **All ten checklist rows close.**
+Task 12
 (submission package) is a *deliverable*, not a feature -- never cut it. Cut line if
 behind: drop task 5 (learning loop), then the P2 items inside 12. Tasks 8-11 are already
 cut.

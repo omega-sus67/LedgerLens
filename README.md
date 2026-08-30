@@ -261,6 +261,53 @@ not a login. Full reasoning and the named gaps in
 
 ---
 
+## When it doesn't know, it says so
+
+The strongest thing this system does is refuse. Two different refusals, both reachable
+from the sidebar:
+
+**1. It declines to detect.** `payment_success_rate` launched 2026-06-23 and has less
+history than its warmup requires. Rather than run a baseline that cannot support a
+verdict, detection declines and asks for a window — then explains the window you give
+it, with the uncertainty stated.
+
+**2. It declines to explain.** Tick **"Deploy source (github) not connected"** in the
+sidebar. Every github-sourced change is removed at candidate generation — as if the
+connector had never been wired up. The anomaly is still real and still −85%, but the
+change that caused it was never in the ledger:
+
+> `mrr_renewals` in DACH · Enterprise · sepa down 85% — **no connected change explains it**
+>
+> The anomaly is real … The closest candidate scored **0.38, below the 0.45 floor**. No
+> recorded change whose blast radius touches this cohort clears the confidence floor.
+> Connected sources: feature flags (launchdarkly), campaigns (calendar), pricing
+> (pricing_db), support tickets (zendesk). **Not connected: deploys (github) — simulated
+> as disconnected for this run**; vendor status feeds; billing policy change logs. The
+> cause may well sit in one of those.
+>
+> `[P1]` data platform: **Connect github** so the next incident of this shape has
+> candidates to test.
+
+Three properties worth noting, all tested:
+
+- **The cause is absent, not demoted.** `deploy_sepa_v214` appears nowhere — not ranked,
+  not rejected, not in the evidence. An unconnected system produces no rows, not a
+  low-scoring candidate; filtering anywhere later would model "we saw it and dismissed
+  it", which is a different and less honest scenario.
+- **The decoy does not win by default.** Removing github removes eight other deploys
+  too, thinning the field — and `campaign_dach_cut` is *still* rejected by its own
+  segment-sibling control. A decoy promoted the moment its rivals vanish would mean the
+  control had never been doing the work.
+- **The connectivity list is read off the KPI contract's lineage**, not retyped into the
+  narrator. Add a connector to the contract and the card mentions it; a test fails if it
+  does not.
+
+Abstention never varies by audience: a CFO is not handed a confident answer the analyst
+was refused. Full reasoning in
+[`docs/abstention_decisions.md`](docs/abstention_decisions.md).
+
+---
+
 ## LLM versus non-LLM, and what a diagnosis costs
 
 **Nothing on the ranking path calls a model.** Detection, attribution, candidate
