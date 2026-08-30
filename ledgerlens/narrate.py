@@ -199,6 +199,10 @@ def narrate(
         update={
             "queries_on_card": len(_pipeline.card_query_ids(card)),
             "stage_ms": {**payload.telemetry.stage_ms, "narrate": narrate_ms},
+            # total_ms was measured inside diagnose(), which had already returned
+            # before narration started. Extend it, or the panel lists a stage that
+            # its own total excludes and the share column sums past 100%.
+            "total_ms": payload.telemetry.total_ms + narrate_ms,
         }
     )
     return card.model_copy(update={"telemetry": telemetry})

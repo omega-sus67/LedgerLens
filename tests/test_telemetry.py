@@ -181,3 +181,14 @@ def test_the_abstention_card_is_also_accounted_for(store):
     assert card.no_confident_cause is True
     assert card.telemetry is not None
     assert card.telemetry.queries_on_card == len(pipeline.card_query_ids(card))
+
+
+def test_the_cards_total_covers_every_stage_it_lists(store):
+    """The panel renders each stage's share of total. If narration is listed as a
+    stage but excluded from the total, those shares sum past 100% -- a small number
+    that makes a careful reader distrust the rest of the panel."""
+    card = pipeline.run("mrr_renewals", pipeline.DEFAULT_AS_OF, store=store)
+    t = card.telemetry
+    assert t.total_ms >= sum(t.stage_ms.values()), (
+        f"stages sum to {sum(t.stage_ms.values()):.1f} ms but total is {t.total_ms:.1f} ms"
+    )

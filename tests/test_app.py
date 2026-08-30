@@ -155,3 +155,15 @@ def test_switching_persona_recomputes_instead_of_serving_a_stale_payload(truth):
 
     at.sidebar.selectbox[1].select("analyst").run()
     assert at.title[0].value == analyst_title, "analyst view did not come back"
+
+
+def test_telemetry_panel_states_the_zero_and_prices_the_alternative(truth):
+    """MPE rows 9 and 10 on the page, not just in the README. The zero is only an
+    argument if the alternative is priced beside it."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
+    assert at.exception == []
+    assert "0 LLM calls" in text
+    assert "$0.0000" in text
+    assert config.MODEL in text, "the counterfactual must be priced, not waved at"
+    assert "no query_id" in text, "the telemetry carve-out must be stated, not hidden"
