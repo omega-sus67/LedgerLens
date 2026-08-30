@@ -19,106 +19,104 @@ Run [`demo_preflight.py`](../demo_preflight.py) first.
 Say this in the first fifteen seconds and return to it in the last fifteen. Everything
 between is evidence for it:
 
-> **Every tool in this category searches your data for the answer. The answer usually isn't
-> in your data — it's in your change log. We search that instead, and then try to prove
-> ourselves wrong.**
+> **Most tools go hunting through your data for the answer. But the answer usually isn't in
+> the data — it's in the list of things your company changed that week. So that's where we
+> look first. And then we try our best to prove ourselves wrong.**
 
 The three moments that win this: **the decoy dying (1:01)**, **the model proposing but not
 deciding (2:02)**, and **the refusal (4:20)**.
 
 ---
 
-## Beat 1 — The wedge (0:00–0:30) · ~71 words
+## Beat 1 — The wedge (0:00–0:30) · ~77 words
 
 **On screen:** headline, four metric tiles, seasonality line.
 **Point at:** the headline, then the four tiles left to right.
 
-> "A dashboard tells you renewals fell eight percent. It can't tell you *why* — and that
-> question costs an analyst three days.
+> "Your dashboard says renewals dropped eight percent. It won't tell you why. Finding that
+> out takes an analyst about three days.
 >
-> Here's what this category gets wrong. The cause of a metric movement is almost never in
-> the metric's own table. It's in your change log. So we search that instead — then try to
-> disprove what we find.
+> Here's the thing most tools miss. The reason a number moved is almost never hiding in the
+> numbers. It's in the list of things your company changed. So that's where we look first —
+> and then we try to prove ourselves wrong.
 >
-> A hundred and twenty-two thousand daily facts. Ninety-nine slices. Eighteen months."
+> This is real data. A hundred and twenty-two thousand rows, ninety-nine slices, eighteen
+> months."
 
 > **Technique —** Framing. The scale line is four seconds that permanently retires the
 > "is this a toy?" question.
 
-## Beat 2 — Decomposed, then drilled (0:31–1:00) · ~63 words
+## Beat 2 — Decomposed, then drilled (0:31–1:00) · ~80 words
 
 **On screen:** the Attribution table.
 **Point at:** the seasonality line, then the `◀ focal` row on the bottom line of the table.
 
-> "Down eight-point-three percent. Nine-tenths of that is ordinary August seasonality —
-> measured from the same cohort a year earlier, not assumed. So the number that matters is
-> the remaining seven-point-five.
+> "Renewals are down eight point three percent. Some of that's just August — it's always
+> slower. We measured that from the same customers a year ago, so it's not a guess. Take it
+> out, and seven and a half percent is genuinely wrong.
 >
-> Then it narrows to the smallest slice carrying the damage. DACH, Enterprise, SEPA. Down
-> eighty-five percent. Four hundred sixteen thousand dollars — ninety-five percent of its
-> parent's shortfall.
->
-> Three slices out of ninety-nine."
+> Then it zooms in — to the exact group that's hurting. German enterprise customers paying by
+> bank transfer. Down eighty-five percent. Four hundred sixteen thousand dollars. Almost all
+> of the damage, in three groups out of ninety-nine."
 
 > **Technique —** Statistics and SQL. Robust MAD-z on a frozen Theil–Sen baseline, with
 > Benjamini–Hochberg across drill levels — the `BH` column. Robust estimators *because* a
 > mean-based detector lets the outlier inflate its own definition of normal.
 
-## Beat 3 — The decoy dies ★ (1:01–1:40) · ~101 words
+## Beat 3 — The decoy dies ★ (1:01–1:40) · ~106 words
 
 **The forty seconds that win this. Slow down.**
 **On screen:** the rejected card and its five-rule control table.
 **Point at:** the red REJECTED banner → the **N** bar sitting at zero → the pink R2 row.
 
-> "Now the one that matters. Marketing cut DACH spend one day *before* renewals broke.
-> Temporally more plausible than the truth. A correlation ranker puts it first.
+> "Now the interesting part. Marketing cut their German ad budget one day before renewals
+> fell. One day. That looks guilty — and most tools would blame it.
 >
-> We try to kill it instead. If this were a region-wide demand shock, nothing spares
-> Mid-market and SMB on the same rail — so the engine predicts they dropped too.
+> So we tried to clear it. If the ads were the problem, smaller customers in the same country
+> should have dropped too. Same ads, same market.
 >
-> They came in flat. Minus one-point-three percent.
+> They didn't. They stayed flat.
 >
-> That's a decisive failure. **N** goes to zero. The candidate isn't ranked second — it's
-> *rejected*. A decoy still on the list is one an executive might act on.
+> That rules it out. Not 'ranked lower' — ruled out. Because a suspect still on the list is
+> one somebody might act on, and acting on the wrong cause is the expensive mistake.
 >
-> The winner survived all four controls. Point seven hundred."
+> The real culprit was a payment code release. It passed all four of our checks."
 
 > **Technique —** Business rules. Five named, falsifiable controls — R1 region-complement,
 > R2 segment-siblings, R3 geo-complement, R4 objective-mismatch, R5 temporal-placebo. A rule
 > you can *name* is one a domain expert can argue with. A learned weight isn't.
 
-## Beat 4 — Innocent here, guilty there (1:41–2:01) · ~55 words
+## Beat 4 — Innocent here, guilty there (1:41–2:01) · ~54 words
 
 **On screen:** the evidence chain, then Recommended actions.
 **Point at:** the `[P2]` action and the `basis:` query id beneath it.
 
-> "And here it stops being a filter and becomes a product.
+> "And here's where it gets useful.
 >
-> The campaign didn't cause *this*. But the controls found it did exactly what it was
-> designed to do — DACH new-logo bookings, down thirty-one percent.
+> The ad cut didn't cause this — but while we were checking, we found it did do something.
+> New sign-ups in Germany are down thirty-one percent. Real problem. Different problem.
 >
-> Cleared of this charge, convicted of another, routed to whoever owns that budget — with
-> the query id underneath."
+> So we clear it of one charge, flag the other, and send that to whoever owns the budget."
 
 > **Technique —** Business rules. R4 objective-mismatch produces both findings from a single
 > check. Every action carries `basis:` — a replayable query, not an assertion.
 
-## Beat 5 — The model proposes, the engine disposes ★ (2:02–2:35) · ~83 words
+## Beat 5 — The model proposes, the engine disposes ★ (2:02–2:35) · ~92 words
 
 **On screen:** the 🤖 investigator lane — proposed-checks table, then unverifiable causes.
 **Point at:** the `verdict` column → the "accepted / rejected by validation" line → the
 `query_id` column.
 
-> "Now the AI — and note where it sits. *Below* the verdict, not above it.
+> "Now the AI — and notice where it sits. After the answer, not before it.
 >
-> The model reads the anomaly and the controls already run, and proposes further checks. But
-> only by filling a fixed template vocabulary. It doesn't write SQL. *We* execute these, and
-> the results stand regardless of what it expected.
+> The model looks at what we found and suggests more things to check. But it picks from a
+> fixed menu. It doesn't write the database queries — we do. And whatever comes back comes
+> back, whether it expected that or not.
 >
-> Read the denominator: five accepted, one rejected by validation. That one named a dimension
-> that doesn't exist. It never became a query.
+> See that line: five suggestions accepted, one thrown out. The one we threw out named a
+> region that doesn't exist. It never got to run.
 >
-> Every accepted check carries a replayable query id."
+> And every check that did run, you can run again yourself."
 
 > **Technique —** LLM, proposing only. The validation gate runs *before* execution. Proposed
 > checks are built `decisive=False` and never reach `controls.score_n` — a test asserts every
@@ -129,14 +127,14 @@ deciding (2:02)**, and **the refusal (4:20)**.
 **On screen:** the unverifiable-causes panel, then back to the headline.
 **Point at:** the "would need / would test" lines, then the headline itself.
 
-> "It also lists causes the connected data *cannot* test — each naming the feed that would
-> settle it.
+> "It also lists things that might be the cause but we can't check — and names the system
+> you'd need to find out.
 >
-> And that headline was written by the model. It passed two guards: every figure appears in
-> the verified payload, and it makes no causal claim this engine doesn't make. One invented
-> digit and the whole narration is discarded.
+> That headline? The AI wrote it. But it passed two checks first: every number in it already
+> exists in our results, and it can't say something *caused* this, because we can't prove
+> that.
 >
-> **The model writes the prose. Never the numbers. Never the verdict.**"
+> The AI writes the words. Never the numbers. Never the answer."
 
 > **Technique —** LLM behind deterministic guards. This is the beat that answers *"the LLM
 > must not be the source of quantitative truth"* — enforced in code, not requested in a prompt.
@@ -146,105 +144,104 @@ deciding (2:02)**, and **the refusal (4:20)**.
 **On screen:** CFO headline (3:01–3:11), then On-Call headline (3:12–3:23).
 **Point at:** each headline as it changes. **Do not touch Growth here** — that is beat 8.
 
-> "Same evidence, different readers. The CFO gets dollars and forecast risk — and an
-> *escalation*, never an instruction to roll back a release, because they don't hold that
-> lever. On-call gets the event id and the rollback.
+> "Same findings, different people. The finance lead gets the money and the forecast risk —
+> and a note to escalate, not an instruction to roll back a release, because that isn't their
+> call.
 >
-> These aren't three analyses. It's one computation rendered three ways — and the query ids
-> underneath are identical."
+> The on-call engineer gets the release name and the rollback.
+>
+> Same analysis underneath. We just tell it differently depending on who's reading."
 
 > **Technique —** Deterministic rendering. Persona sits downstream of every query and
 > structurally cannot reach one. Decision rights are mechanical, not cosmetic.
 
-## Beat 8 — Redaction that names itself (3:24–3:51) · ~73 words
+## Beat 8 — Redaction that names itself (3:24–3:51) · ~74 words
 
 **On screen:** Growth Marketing — the 🔒 banner, and changed numbers.
 **Point at:** the banner's policy id → the focal cohort → the headline percentage.
 
-> "Growth is a different question — not a different voice, a different *entitlement*. Their
-> contract withholds the payment-rail cut, so the drill-down never sees it.
+> "Marketing sees a different version — and not because we softened it. They're not allowed
+> to see payment data, so the tool genuinely can't split the numbers that way for them.
 >
-> The analyst saw DACH Enterprise SEPA, down eighty-five. Growth sees DACH Enterprise product
-> A — down thirty-five. Smaller because their cut is shallower, *not* because the engine
-> failed.
+> The analyst saw eighty-five percent. Marketing sees thirty-five. Smaller because they're
+> seeing less, not because anything broke.
 >
-> And the card says so, naming the policy and quoting its reason. Ranked order identical.
-> Entitlement hides cuts, never candidates."
+> And the page says so — it names the rule and explains why. Same suspects, same order. They
+> just can't see one slice of the detail."
 
 > **Technique —** Business rules, enforced at exactly one chokepoint. And the banner never
 > *counts* what it hides — that would mean computing the answer the reader isn't entitled to.
 
-## Beat 9 — It declines to detect (3:52–4:19) · ~73 words
+## Beat 9 — It declines to detect (3:52–4:19) · ~77 words
 
 **On screen:** `payment_success_rate` — the banner sits **above** the title.
 **Point at:** the banner → the pre-filled window controls → the ratio caption under
 Attribution. **Don't scroll into the hypothesis list on this KPI.**
 
-> "Third KPI, deliberately broken. It launched in June — fifty-six days of history against a
-> hundred-and-twenty-day warmup. So detection *declines before it looks at a single value*,
-> and says why.
+> "Third metric, awkward on purpose. It launched in June — under two months of
+> history. Not enough to know what normal looks like. So it refuses to guess, and says why.
 >
-> It's also a rate, and rates aren't additive — stored as two metrics, aggregated as a
-> weighted ratio, drill-down switched off rather than shown wrong.
+> It's also a percentage, and those don't add up like money — so we switch off the
+> breakdown rather than show something that looks right and isn't.
 >
-> But declining to detect isn't declining to help. Give it a window and the whole chain still
-> runs."
+> Refusing to guess isn't refusing to help. Give it a date range and it still finds that
+> payment release."
 
 > **Technique —** Statistics plus contract rules. The warmup gate is a threshold in the KPI
 > contract, not a constant in the engine. No seasonality is claimed: this KPI has no prior
 > August.
 
-## Beat 10 — When it doesn't know, it says so ★ (4:20–4:51) · ~83 words
+## Beat 10 — When it doesn't know, it says so ★ (4:20–4:51) · ~84 words
 
 **On screen:** abstention headline (4:20–4:37), then the diagnosis text (4:38–4:51).
 **Point at:** the headline → the connected / not-connected source list.
 
-> "Last one, and the one I'd want you to remember. Simulate the deploy connector never having
-> been wired up.
+> "Last one, and it's my favourite. Pretend we never connected the system that tracks code
+> releases.
 >
-> The change that caused this was never in the ledger, so the system **refuses to name a
-> cause**. Closest candidate: zero-three-eight, against a floor of zero-four-five. It names
-> what's connected, what isn't, and what to connect next.
+> The drop is still there — still eighty-five percent. But the thing that caused it isn't in
+> our records now. So it refuses to name a cause. Nothing scored high enough. It tells you
+> what it can see, what it can't, and what to plug in next.
 >
-> The true cause isn't demoted — it's gone entirely. And the decoy is *still rejected*.
+> And notice: it still rules out the ad cut, even with nothing left competing.
 >
-> It degrades toward 'I don't know', never toward a confident wrong answer."
+> When it doesn't know, it says so."
 
 > **Technique —** Deterministic set logic, applied at candidate generation. Filtering later
 > would model *"we saw it and dismissed it"* — a different and less honest scenario.
 
-## Beat 11 — A prior you can delete (4:52–5:09) · ~47 words
+## Beat 11 — A prior you can delete (4:52–5:09) · ~45 words
 
 **On screen:** the top hypothesis after a 👍.
 **Point at:** **the score** — it reads `0.708`, not `0.700` — then the **P** component.
 
-> "An analyst confirms it — watch the score move. Seven hundred to seven-oh-eight.
+> "An analyst confirms it — watch the score tick up.
 >
-> **P** is counted from verdict rows. Nothing trained, nothing to drift — delete the row and
-> the prior returns exactly where it was. Weighted five percent: it sharpens a ranking, never
-> overturns a control."
+> That's it learning. But it's only counting past answers, not training anything. Delete the
+> click and it goes straight back. And it's capped low, so it can nudge the order but never
+> overrule a check."
 
 > **Technique —** Statistics — Beta–Bernoulli, derived from rows rather than kept as state.
 > That `0.008` shift is the entire influence this loop is permitted.
 
-## Beat 12 — The split, precisely (5:10–5:45) · ~99 words
+## Beat 12 — The split, precisely (5:10–5:45) · ~102 words
 
 **On screen:** ⏱ Telemetry — four tiles, the stage table, the *LLM vs non-LLM* paragraph.
 **Point at:** "Queries executed 89" → "Replayable on this card 22" → the LLM cost tile.
 *Read the counts off the screen; they move as features land.*
 
-> "So here's the accounting — on the page, not in a slide.
+> "So here's the honest accounting — on the page, not in a slide.
 >
-> Everything that produced a *number* is SQL, set intersection, named business rules and
-> robust statistics. Eighty-nine queries; twenty-two replayable from this card. No traditional
-> ML — with one incident there's no training set. And no causal inference claimed: these are
-> negative controls. They falsify. They don't estimate.
+> Every number here came from database queries, simple matching, rules we wrote down, and
+> standard statistics. Eighty-nine of them. Twenty-two you can open and re-run right here.
 >
-> The model proposed checks and wrote the prose — half a cent — and changed none of the
-> numbers above.
+> No machine learning anywhere — with one incident there's nothing to train on. And we don't
+> claim we proved the cause. We ruled things out. That's different, and we say so.
 >
-> Dashboards tell you what moved. This tells you why, tries to prove itself wrong first, and
-> shows you the receipt."
+> The AI suggested checks and wrote the summary. Half a cent. It changed none of these
+> numbers.
+>
+> Dashboards tell you what moved. This tells you why — and shows its working."
 
 > **Technique —** The whole map, out loud. See the table below and name each one.
 
