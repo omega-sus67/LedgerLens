@@ -122,3 +122,36 @@ def test_sparse_kpi_hides_the_drill_tree():
     at.sidebar.selectbox[0].set_value("payment_success_rate").run()
     text = " ".join(c.value for c in at.caption)
     assert "additiv" in text.lower()
+
+
+def test_growth_persona_card_names_the_redaction_policy(truth):
+    """The UI half of MPE row 7: switching persona to growth must visibly redact,
+    and must name the policy that did it rather than just showing less."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    at.sidebar.selectbox[1].select("growth").run()
+    text = " ".join(m.value for m in at.markdown) + " ".join(w.value for w in at.warning)
+    assert at.exception == []
+    assert "fin.rail_detail" in text
+    assert "payment_rail" in text
+
+
+def test_analyst_view_shows_no_redaction_banner(truth):
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    text = " ".join(w.value for w in at.warning)
+    assert "fin.rail_detail" not in text
+
+
+def test_switching_persona_recomputes_instead_of_serving_a_stale_payload(truth):
+    """The cache-key debt, asserted. Entitlement changes the PAYLOAD, so a cache keyed
+    without role would hand growth the analyst's numbers -- a redaction that redacts
+    nothing. Switch away and back; both views must be their own."""
+    at = AppTest.from_file(APP_PATH, default_timeout=180).run()
+    analyst_title = at.title[0].value
+
+    at.sidebar.selectbox[1].select("growth").run()
+    growth_title = at.title[0].value
+    assert growth_title != analyst_title
+    assert "sepa" not in growth_title, "growth was served a payment_rail cohort"
+
+    at.sidebar.selectbox[1].select("analyst").run()
+    assert at.title[0].value == analyst_title, "analyst view did not come back"

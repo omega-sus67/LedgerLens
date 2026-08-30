@@ -28,14 +28,25 @@ st.set_page_config(page_title="LedgerLens", page_icon="🔎", layout="wide")
 
 
 @st.cache_resource(show_spinner="Running diagnosis...")
-def load_payload(metric: str, as_of_iso: str, cohort_key: str = "", window_key: str = ""):
-    """Cached on (metric, as_of) ONLY. Persona is applied AFTER this boundary, which
-    is what makes switching persona instant -- and what makes "identical evidence"
-    structurally true rather than a coincidence of determinism.
+def load_payload(
+    metric: str,
+    as_of_iso: str,
+    cohort_key: str = "",
+    window_key: str = "",
+    role_key: str = "",
+):
+    """Cached on everything that changes the PAYLOAD.
 
-    Task 4 (role-based entitlement) CANNOT stay below this boundary: hiding a
-    dimension changes which cuts are drilled, so it changes the payload itself.
-    Add `role` to this key when Task 4 lands.
+    The boundary rule, and the reason this signature is worth reading before adding
+    an argument: persona is a RENDERING concern and lives BELOW this function, which
+    is what makes switching persona instant and what makes "identical evidence,
+    different narrative" structurally true rather than a coincidence of determinism.
+
+    Role is NOT such a concern. Entitlement changes which dimensions are drilled, so
+    it changes the focal cohort, so it changes the numbers -- it must join the key.
+    Task 7's `drop_sources` is exactly the same shape and belongs here too; Task 5's
+    feedback likewise. This is the cache-key debt docs/persona_decisions.md sec 10
+    left unpaid, now paid once rather than three times.
     """
     import json
     from datetime import date
@@ -48,7 +59,12 @@ def load_payload(metric: str, as_of_iso: str, cohort_key: str = "", window_key: 
         else None
     )
     return store, pipeline.diagnose(
-        metric, date.fromisoformat(as_of_iso), store=store, cohort=cohort, window=window
+        metric,
+        date.fromisoformat(as_of_iso),
+        store=store,
+        cohort=cohort,
+        window=window,
+        role=role_key or None,
     )
 
 
@@ -125,7 +141,9 @@ if kpi.status == "sparse_history":
     cohort_key = json.dumps({"region": [region], "payment_rail": ["sepa"]}, sort_keys=True)
     window_key = json.dumps([w_start.isoformat(), w_end.isoformat()])
 
-store, payload = load_payload(metric, as_of.isoformat(), cohort_key, window_key)
+store, payload = load_payload(
+    metric, as_of.isoformat(), cohort_key, window_key, who.role
+)
 card = (
     narrate.narrate(payload, persona=who)
     if payload is not None
@@ -156,6 +174,22 @@ c2.metric(
 )
 c3.metric("Share of the drop", f"{100 * focal.contribution:.0f}%", delta="of parent shortfall")
 c4.metric("Robust z", f"{focal.residual_z:.1f}", delta=f"threshold {-th.mad_z}")
+
+# The redaction is rendered HERE, beside the number it changed -- not buried in the
+# contract expander. A growth reader sees a smaller shortfall than an analyst does,
+# and without this line that reads as breakage rather than as policy.
+if card.redactions:
+    st.warning(
+        "🔒 **Restricted view.** "
+        + " ".join(
+            f"`{r.dim}` cuts are hidden from role `{who.role}` by policy "
+            f"`{r.policy_id}` — {r.reason}"
+            for r in card.redactions
+        )
+        + "  \nThe headline above is the deepest slice this role may see. An entitled "
+        "reader sees a narrower cohort and a larger shortfall. The candidate ranking "
+        "is unchanged; only its depth is."
+    )
 
 st.markdown(
     f"### Expected **{card.seasonal_pct:.1f}%** (August seasonality). "
