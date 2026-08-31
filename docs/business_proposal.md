@@ -42,6 +42,11 @@ number they can audit themselves, and the margin behaves like classic software r
 like AI tooling. Sections 4.5–4.8 set out the unit economics, pricing, adoption scenarios and
 what compounds.
 
+**The go-to-market is deliberately narrow.** The first market is not "any business with a
+warehouse" — it is **subscription revenue operations**, the niche whose defining failure
+mode the reference incident *is* (§3.1). Adjacent transaction-driven markets are the
+expansion path, not the first sale.
+
 ---
 
 ## 1. Problem framing
@@ -262,7 +267,51 @@ placed second. A decoy still on the list is one an executive might act on.
 
 ---
 
-## 3. Target users
+## 3. Target market and users
+
+### 3.1 The beachhead: subscription revenue operations
+
+We deliberately do not claim every warehouse-owning business as a market. The first
+market is the one whose defining failure mode the reference incident *is*:
+**subscription B2B businesses whose recurring revenue rides on payment rails.**
+
+In these businesses, renewals are collected by machinery — card retries, SEPA and ACH
+direct debit, dunning sequences — and that machinery is changed weekly by deploys,
+flags, pricing updates and campaigns whose targeting is already machine-readable. When a
+change silently breaks a rail, the loss books as *churn*, compounds every billing cycle,
+and the temporally-convenient coincident change takes the blame. That is not incidental
+to our demo; it is the endemic incident type of the niche, and it is exactly the decoy
+pattern the negative-control layer is built to kill.
+
+**The ideal first customer, stated concretely enough to disqualify against:**
+
+| | Qualifies | Disqualifies |
+|---|---|---|
+| Revenue model | Recurring subscriptions collected through payment rails — cards, SEPA/ACH, invoicing with automated dunning | One-off or purely sales-led revenue with no automated collection to break |
+| Scale | ~$20–200M ARR: large enough that an analyst investigates KPI movements, small enough that no in-house causal-inference team exists | Below the scale where anyone owns the "why" question, or above it where one is already staffed |
+| Change surface | Ships weekly — deploys, feature flags, campaigns, pricing changes, each with declared targeting | Change is rare, manual or undocumented: the ledger would be empty |
+| Data | A warehouse (Snowflake, Databricks, BigQuery) plus a billing/PSP stack (Stripe, Adyen, GoCardless, Chargebee, Zuora) whose events are exportable | No queryable source of truth for revenue or changes |
+| Buyer | A revenue-operations, finance-analytics or data lead who personally answers for renewals movements | Nobody owns recurring-revenue diagnosis |
+
+Three reasons this niche comes first, rather than being one vertical among many:
+
+- **The incident type is endemic and individually large.** A silently broken rail books
+  as churn until someone asks why; the reference incident's **−$416k** is mid-sized for
+  the category, and one such incident dominates the year's entire labour saving (§4.2).
+- **The change metadata is richest here.** Beyond GitOps and flag platforms, the billing
+  stack itself emits typed, targeted events — PSP webhooks, dunning-sequence changes,
+  plan and pricing updates — so the connector mapping (§4.9) is measured in days, not
+  quarters.
+- **The falsification rules compound within the niche.** Rail-sibling, segment-sibling
+  and dunning-cohort controls encode subscription-payments mechanics specifically. Each
+  rule written for one customer transfers to every other customer *in the niche* — and to
+  nobody outside it, which is what makes the library a moat rather than a commodity (§4.8).
+
+Adjacent markets that share the mechanics — usage-based infrastructure billing, consumer
+subscriptions, transaction-driven marketplaces — are the expansion path (§4.7), not the
+first sale.
+
+### 3.2 The users inside the account
 
 Four personas render from **one computation**. Persona is accepted only by the narrator,
 which sits downstream of every query — so it *cannot* reach a query, and the evidence
@@ -288,8 +337,9 @@ the `query_id`, so any recommendation opens onto the SQL underneath it.
 
 ### 4.1 Stated assumptions
 
-The brief invites reasonable assumptions, clearly stated. Ours, for a mid-market B2B SaaS
-business at roughly €50M ARR:
+The brief invites reasonable assumptions, clearly stated. Ours, for a beachhead-profile
+customer (§3.1) — a subscription B2B business at roughly €50M ARR collecting renewals
+through payment rails:
 
 | Assumption | Value | Basis |
 |---|---|---|
@@ -389,10 +439,11 @@ assumptions; the capture ratio is a standard enterprise-software heuristic.*
 ### 4.7 What the opportunity looks like at scale
 
 Rather than claim a share of a large market, here is the arithmetic at three adoption levels
-inside a systems integrator's existing client base. A qualifying client is one with a data
-warehouse, three or more tracked KPIs, and an analytics or revenue-operations function —
-which describes most subscription and transaction-driven businesses above roughly $20M
-revenue.
+inside a systems integrator's existing client base. A qualifying client is one matching the
+§3.1 beachhead profile — subscription revenue collected through payment rails, a warehouse,
+a weekly change surface, and a revenue-operations or finance-analytics owner. The counts
+below are run against **that niche alone**; adjacent transaction-driven markets (§3.1) are
+treated as upside, not baked into the arithmetic.
 
 | | Clients live | Recurring licence ARR | Implementation, new clients that year |
 |---|---:|---:|---:|
@@ -409,9 +460,12 @@ rule added for one client is available to all of them.
 
 Three things compound, and none of them is the algorithm:
 
-- **The negative-control rule library.** Each rule encodes a falsifiable mechanism assumption
-  that a domain expert argued for. Five ship today; every incident investigated is a candidate
-  for a sixth, and each one improves every deployment at once.
+- **The negative-control rule library is niche knowledge, not generic code.** Each rule
+  encodes a falsifiable mechanism assumption about subscription-payments mechanics that a
+  domain expert argued for — rail siblings, segment siblings, dunning cohorts. Five ship
+  today; every incident investigated in the niche is a candidate for a sixth, each one
+  improves every deployment at once, and none of it accumulates for a horizontal BI vendor
+  spread across every vertical.
 - **The verdict corpus is per-tenant and cumulative.** Analyst confirmations sharpen a
   client's own prior, and that history does not transfer to a competitor's tool. Switching
   cost accrues without lock-in tactics.
@@ -428,8 +482,8 @@ in what accumulates on top.
 rather than a one-off build.
 
 The engine is constant across customers. **The connector mapping is the deliverable**: the
-declared translation from a client's existing deploy, flag, campaign and ticketing metadata
-into blast-radius predicates. That is client-specific *configuration*, not custom
+declared translation from a client's existing billing, deploy, flag, campaign and ticketing
+metadata into blast-radius predicates. That is client-specific *configuration*, not custom
 engineering, and it is the billable work — a 6–8 week shape for a first KPI family, with
 each additional source a matter of days rather than a rebuild.
 
@@ -483,8 +537,11 @@ telemetry. **343 tests. All ten Minimum Prototype Expectations close.**
 
 ### Phase 2 — Enterprise integration (3–6 months)
 
-Real connectors (GitHub/GitLab, LaunchDarkly, Jira, Zendesk, campaign calendars, pricing
-tables) replacing synthetic fixtures — *the mapping is the only thing that changes*.
+Real connectors replacing synthetic fixtures, beachhead-first: the billing stack before the
+dev stack. **Stripe/Adyen/GoCardless webhooks, Chargebee/Zuora billing and plan-change
+events, dunning-platform sequences** — the feeds that carry the niche's endemic incident —
+then GitHub/GitLab, LaunchDarkly, Jira, Zendesk, campaign calendars and pricing tables.
+*The mapping is the only thing that changes*.
 Warehouse-native execution against Snowflake, Databricks or BigQuery, since the engine is
 already just SQL. SSO and per-user verdict attribution. Push delivery into Slack, email
 and PagerDuty on the channels each persona already declares.

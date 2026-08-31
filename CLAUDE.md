@@ -267,6 +267,25 @@ confirm/reject controls and P is a genuinely learned number.
   That bound is what makes the loop safe to expose to users.
 - Test count **293 -> 307**. `tests/test_learning.py` (11) plus 3 in `test_app.py`.
 
+## Done: niche repositioning of the business proposal (2026-08-31)
+
+The proposal read as horizontally targeted — §3 listed personas (who reads the card)
+where a buyer profile belonged, and §4.7 widened to "most subscription and
+transaction-driven businesses". It now commits to a **beachhead: subscription revenue
+operations** — subscription B2B businesses whose renewals ride on payment rails, the
+niche whose endemic failure mode the reference incident already is.
+
+- §3 is now "Target market and users": §3.1 defines the ICP with a qualify/disqualify
+  table and three reasons the niche is first; §3.2 keeps the personas as users *inside*
+  the account. §4.1/§4.7 run the arithmetic against the beachhead alone; §4.8 recasts
+  the rule library as niche knowledge (rail siblings, dunning cohorts); §5 Phase 2
+  orders connectors billing-stack-first (Stripe/Adyen/GoCardless, Chargebee/Zuora).
+- Postwork D1–D3 framing (SI audience, wedge, why-now) deliberately untouched.
+- `build_deck.py` slides updated to match, and its stale "307 passing tests" fixed to
+  343. PDFs and deck rebuilt via the scripted builds; the two known placeholders
+  (team name, video link) remain, as documented in `submission/README.md`.
+- No test guards `business_proposal.md`; full suite still 343 passing.
+
 ## Conventions this repo uses (learned, not to be reinvented)
 
 - **Every number traces to a query.** `Store.q()` is the only path to the

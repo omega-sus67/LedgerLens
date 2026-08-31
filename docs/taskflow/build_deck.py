@@ -110,7 +110,7 @@ key_slide("Round 1 promised an AI investigator that proposes the checks\n"
 text_slide("What we built", [
     ("A KPI intelligence-to-action engine: root-cause analysis as a set intersection over a ledger of business changes, verified by negative controls.", 0, False),
     ("Diagnoses a −$416,144 renewals shortfall in 1.3 seconds — and rejects the plausible-but-wrong cause a human under time pressure would have acted on.", 0, True),
-    ("307 passing tests. Runs end to end with no API key: the ranking path never calls a model.", 1, False),
+    ("343 passing tests. Runs end to end with no API key: the ranking path never calls a model.", 1, False),
     ("22 distinct query_ids replayable on a single diagnosis card.", 1, False),
     ("Ten of ten Minimum Prototype Expectations close. Eight of eight Round 2 objectives.", 1, False),
 ], sub="github.com/omega-sus67/LedgerLens")
@@ -148,8 +148,9 @@ text_slide("The AI investigator lane — three call sites, all additive", [
     ("~$0.0048 per diagnosis with the lane on. $0.0000 with it off.", 1, False),
 ])
 
-text_slide("Target users — four audiences, one computation", [
-    ("Persona is accepted only by the narrator, downstream of every query — so it cannot reach a query. The evidence behind all four cards is identical by construction.", 0, False),
+text_slide("Who it is for — subscription revenue operations", [
+    ("Beachhead: subscription B2B businesses whose renewals ride on payment rails. A silently broken rail books as churn and the coincident change takes the blame — the reference incident is the niche's endemic failure mode, not a demo convenience.", 0, True),
+    ("Inside the account, four audiences render from one computation. Persona is accepted only by the narrator, downstream of every query — so it cannot reach a query. The evidence behind all four cards is identical by construction.", 0, False),
     ("Revenue Analyst — every control, every query id, the full drill-down lattice.", 1, False),
     ("CFO — dollars and forecast risk, and an escalation. Never an instruction to roll back a release: she does not hold that lever.", 1, False),
     ("Payments On-Call — the event id, the blast radius, the rollback.", 1, False),
@@ -165,7 +166,7 @@ shot_slide("Evidence, telemetry and cost — shown, not asserted",
            crop_left=0.245)
 
 text_slide("Business case and impact", [
-    ("Stated assumptions — mid-market B2B SaaS at ~€50M ARR: ~40 material KPI movements a year, ~3 analyst-days each, ~$460/day fully loaded. Directional sizing, not measured results.", 0, False),
+    ("Stated assumptions — a beachhead-profile customer: subscription B2B at ~€50M ARR, renewals via payment rails. ~40 material KPI movements a year, ~3 analyst-days each, ~$460/day fully loaded. Directional sizing, not measured results.", 0, False),
     ("Analyst time recovered — ~$55k/year of capacity redirected from evidence assembly to judgement. Real, but the smaller half.", 0, False),
     ("Wrong-action avoidance — the larger half. Acting on the decoy leaves the −$410k leak running AND reverses a campaign on a false premise. One avoided misattribution dominates the entire labour saving.", 0, True),
     ("Decision-window preservation — 1.3 seconds instead of three days means the finding lands while the fix is still cheap.", 0, False),
@@ -178,7 +179,7 @@ text_slide("Phased roadmap", [
     ("Phase 1 — Rigour (1–2 months)", 0, True),
     ("Difference-in-differences with bootstrap CI · calendar-regressor baseline enabling bidirectional detection · the discriminating test between near-tied candidates · a bounded exploration pass before abstaining.", 1, False),
     ("Phase 2 — Enterprise integration (3–6 months)", 0, True),
-    ("Real connectors replacing synthetic fixtures — the mapping is the only thing that changes. Warehouse-native execution on Snowflake/Databricks/BigQuery, since the engine is already just SQL. SSO and per-user verdict attribution. Push delivery to Slack, email, PagerDuty.", 1, False),
+    ("Real connectors, beachhead-first — Stripe/Adyen/GoCardless webhooks, Chargebee/Zuora billing events and dunning platforms before the dev stack; the mapping is the only thing that changes. Warehouse-native execution on Snowflake/Databricks/BigQuery, since the engine is already just SQL. SSO and per-user verdict attribution. Push delivery to Slack, email, PagerDuty.", 1, False),
     ("Phase 3 — Proactive (6–12 months)", 0, True),
     ("A watchtower that surfaces anomalies rather than waiting to be pointed · the LLM event normalizer, gated behind confidence calibration · cross-KPI interaction detection.", 1, False),
 ])
