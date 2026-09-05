@@ -14,6 +14,15 @@ ranked — and every number on the page opens onto the SQL that produced it.
 
 Built for the Accenture Innovation Challenge 2026, problem statement 3.
 
+> **Why read this README?** It lays out the system's architectural principles, deterministic root-cause engine, and exact steps to run and audit the system.
+>
+> **New here?** [`docs/how_it_works.md`](docs/how_it_works.md) explains the whole system
+> from zero -- no analytics background assumed. Everything below assumes the vocabulary
+> it teaches.
+>
+> **Want the full ordered path through the repo?** [`study_guide.md`](study_guide.md)
+> sequences every document and source file end to end, with checkpoints.
+
 ---
 
 ## The moment worth seeing
